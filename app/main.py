@@ -53,7 +53,7 @@ async def get_current_user(db: Session = Depends(get_session), session_id: str =
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="login.html")
 
 @app.post("/login")
 async def login_submit(
