@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}{{ driver.name }} - Driver Detail | FLOS{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex items-center justify-between">
+    <div class="flex items-center space-x-4">
+        <a href="/" class="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-400">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ driver.name }}</h1>
+            <p class="text-sm text-gray-500">Driver Profile & Financial Oversight</p>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+            ID: {{ driver.operator_id }}
+        </span>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {% if driver.driver_type == 'internal' %}bg-purple-100 text-purple-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+            {{ driver.driver_type|upper }}
+        </span>
+    </div>
+</div>
+
+<!-- KPI Summary -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <p class="text-sm font-medium text-gray-500 mb-1">Expected (Today)</p>
+        <p class="text-2xl font-bold text-gray-900">{{ "{:,.2f}".format(kpis.today_expected) }} ETB</p>
+    </div>
+    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-green-500">
+        <p class="text-sm font-medium text-gray-500 mb-1">Total Deposited</p>
+        <p class="text-2xl font-bold text-gray-900">{{ "{:,.2f}".format(kpis.total_actual) }} ETB</p>
+    </div>
+    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-orange-500">
+        <p class="text-sm font-medium text-gray-500 mb-1">Total Variance</p>
+        <p class="text-2xl font-bold text-red-600">{{ "{:,.2f}".format(kpis.variance) }} ETB</p>
+    </div>
+    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <p class="text-sm font-medium text-gray-500 mb-1">Compliance Rate</p>
+        <div class="flex items-center">
+            <p class="text-2xl font-bold text-gray-900">{{ "{:.1f}%".format(kpis.compliance) }}</p>
+            <div class="ml-4 flex-grow bg-gray-100 rounded-full h-2 max-w-[100px]">
+                <div class="bg-green-500 h-2 rounded-full" style="width: {{ kpis.compliance }}%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Profile & Reconciliation History -->
+    <div class="lg:col-span-2 space-y-8">
+        <!-- Reconciliation History Table -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h3 class="text-sm font-bold text-gray-900 uppercase">Reconciliation History</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-white">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Expected</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actual</th>
+                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for r in reconciliations %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ r.date }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">{{ "{:,.2f}".format(r.expected_amount) }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-green-600">{{ "{:,.2f}".format(r.actual_amount) }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase 
+                                    {% if r.status == 'Verified' %}bg-green-100 text-green-800
+                                    {% elif r.status == 'Missing Deposit' %}bg-red-100 text-red-800
+                                    {% else %}bg-orange-100 text-orange-800{% endif %}">
+                                    {{ r.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500 italic">No reconciliation records found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Telebirr Transaction History -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <h3 class="text-sm font-bold text-gray-900 uppercase text-blue-600">Telebirr Deposits</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-white">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Transaction ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Timestamp</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Amount (ETB)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for tx in transactions %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{{ tx.transaction_id }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">{{ "{:,.2f}".format(tx.amount) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500 italic">No Telebirr deposits recorded.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Info -->
+    <div class="space-y-6">
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Contact Information</h4>
+            <div class="space-y-4">
+                <div>
+                    <p class="text-xs text-gray-400">Phone Number</p>
+                    <p class="text-sm font-medium">{{ driver.phone or "Not provided" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400">Yango ID (Operator)</p>
+                    <p class="text-sm font-mono">{{ driver.operator_id }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400">Registration Date</p>
+                    <p class="text-sm font-medium">{{ driver.created_at.strftime('%B %d, %Y') }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-purple-600 p-6 rounded-xl shadow-lg text-white">
+            <h4 class="text-xs font-bold text-purple-200 uppercase tracking-widest mb-4">Fleet Management</h4>
+            <p class="text-sm mb-4">This driver is currently marked as <strong>{{ driver.driver_type|upper }}</strong>.</p>
+            <form action="/api/drivers/update-type" method="POST" class="space-y-3">
+                <input type="hidden" name="driver_id" value="{{ driver.id }}">
+                <select name="driver_type" class="w-full bg-purple-700 border-purple-500 text-white rounded-md text-sm p-2 focus:ring-purple-400">
+                    <option value="internal" {% if driver.driver_type == 'internal' %}selected{% endif %}>Internal Driver</option>
+                    <option value="external" {% if driver.driver_type == 'external' %}selected{% endif %}>External Driver</option>
+                </select>
+                <button type="submit" class="w-full bg-white text-purple-700 font-bold py-2 rounded-md hover:bg-purple-50 transition-colors text-sm">
+                    Update Type
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

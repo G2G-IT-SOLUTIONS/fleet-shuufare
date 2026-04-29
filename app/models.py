@@ -7,6 +7,7 @@ class Driver(SQLModel, table=True):
     operator_id: str = Field(unique=True, index=True)
     name: str
     phone: Optional[str] = None
+    driver_type: str = Field(default="external", index=True) # "internal" or "external"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     expected_revenues: List["ExpectedRevenue"] = Relationship(back_populates="driver")
