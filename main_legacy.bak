@@ -1,0 +1,457 @@
+"""
+YANGO Fleet API - Driver Transactions Viewer
+Correct implementation based on API specification
+"""
+
+import requests
+import json
+import time
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict
+
+
+class YangoFleetAPI:
+    """YANGO Fleet API Client"""
+    
+    BASE_URL = "https://fleet-api.yango.tech"
+    
+    def __init__(self, api_key: str, client_id: str, park_id: str):
+        self.api_key = api_key
+        self.client_id = client_id
+        self.park_id = park_id
+        
+        self.session = requests.Session()
+        self.session.headers.update({
+            "X-API-Key": self.api_key,
+            "X-Client-ID": self.client_id,
+            "Content-Type": "application/json"
+        })
+    
+    def _request(self, method: str, endpoint: str, **kwargs) -> Dict:
+        """Make API request"""
+        url = f"{self.BASE_URL}{endpoint}"
+        
+        # Add X-Park-ID header for all requests
+        if "headers" not in kwargs:
+            kwargs["headers"] = {}
+        kwargs["headers"]["X-Park-ID"] = self.park_id
+        
+        print(f"   → {method} {endpoint}")
+        
+        try:
+            response = self.session.request(method, url, **kwargs)
+            
+            if response.status_code == 429:
+                print("   ⚠️ Rate limited, waiting 3 seconds...")
+                time.sleep(3)
+                response = self.session.request(method, url, **kwargs)
+            
+            if response.status_code == 401:
+                print(f"   ❌ Authentication failed - Check API key and Client ID")
+                if response.text:
+                    print(f"   Response: {response.text}")
+                return {}
+            
+            if response.status_code == 403:
+                print(f"   ❌ Access forbidden - Check permissions")
+                if response.text:
+                    print(f"   Response: {response.text}")
+                return {}
+            
+            if response.status_code == 400:
+                print(f"   ❌ Bad Request")
+                if response.text:
+                    print(f"   Response: {response.text}")
+                return {}
+            
+            response.raise_for_status()
+            return response.json() if response.content else {}
+            
+        except requests.exceptions.RequestException as e:
+            print(f"   ❌ Error: {e}")
+            return {}
+    
+    # ========================================================================
+    # Driver Profile API
+    # ========================================================================
+    
+    def get_driver_profile(self, contractor_profile_id: str) -> Dict:
+        """Get driver profile"""
+        return self._request(
+            "GET",
+            f"/v2/parks/contractors/driver-profile?contractor_profile_id={contractor_profile_id}"
+        )
+    
+    def get_blocked_balance(self, contractor_id: str) -> Dict:
+        """Get blocked balance"""
+        return self._request(
+            "GET",
+            f"/v1/parks/contractors/blocked-balance?contractor_id={contractor_id}"
+        )
+    
+    # ========================================================================
+    # Transactions API - Based on Exact API Spec
+    # ========================================================================
+    
+    def get_transaction_categories(self, park_id: str) -> List[Dict]:
+        """
+        Get available transaction categories
+        POST /v2/parks/transactions/categories/list
+        """
+        body = {"park_id": park_id}
+        
+        response = self._request(
+            "POST",
+            "/v2/parks/transactions/categories/list",
+            json=body
+        )
+        return response.get("categories", [])
+    
+    def get_driver_transactions(
+        self, 
+        driver_profile_id: str,
+        event_at_from: str, 
+        event_at_to: str,
+        category_ids: Optional[List[str]] = None,
+        limit: int = 100,
+        cursor: Optional[str] = None
+    ) -> Dict:
+        """
+        Get driver transaction history
+        POST /v2/parks/driver-profiles/transactions/list
+        
+        According to API spec - request body structure:
+        {
+          "query": {
+            "park": {
+              "id": "park_id",
+              "driver_profile": {
+                "id": "driver_profile_id"
+              },
+              "transaction": {
+                "event_at": {
+                  "from": "datetime",
+                  "to": "datetime"
+                },
+                "category_ids": ["category1", "category2"]  // optional
+              }
+            }
+          },
+          "limit": 100,  // optional
+          "cursor": "cursor_value"  // optional, for pagination
+        }
+        """
+        # Build the request body according to spec
+        body = {
+            "query": {
+                "park": {
+                    "id": self.park_id,
+                    "driver_profile": {
+                        "id": driver_profile_id
+                    },
+                    "transaction": {
+                        "event_at": {
+                            "from": event_at_from,
+                            "to": event_at_to
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Add limit if specified
+        if limit:
+            body["limit"] = limit
+        
+        # Add category filter if specified
+        if category_ids:
+            body["query"]["park"]["transaction"]["category_ids"] = category_ids
+        
+        # Add cursor for pagination if provided
+        if cursor:
+            body["cursor"] = cursor
+        
+        response = self._request(
+            "POST",
+            "/v2/parks/driver-profiles/transactions/list",
+            json=body
+        )
+        return response
+    
+    def get_all_driver_transactions(
+        self,
+        driver_profile_id: str,
+        event_at_from: str,
+        event_at_to: str,
+        category_ids: Optional[List[str]] = None
+    ) -> List[Dict]:
+        """Get all transactions using pagination"""
+        all_transactions = []
+        cursor = None
+        page = 1
+        
+        print(f"   Fetching page {page}...")
+        
+        while True:
+            response = self.get_driver_transactions(
+                driver_profile_id=driver_profile_id,
+                event_at_from=event_at_from,
+                event_at_to=event_at_to,
+                category_ids=category_ids,
+                limit=100,
+                cursor=cursor
+            )
+            
+            if not response:
+                break
+            
+            transactions = response.get("transactions", [])
+            all_transactions.extend(transactions)
+            
+            # Get next cursor
+            cursor = response.get("cursor")
+            
+            if not cursor or len(transactions) < 100:
+                break
+            
+            page += 1
+            print(f"   Fetching page {page}...")
+            time.sleep(0.5)  # Small delay between pages
+        
+        return all_transactions
+
+
+def format_currency(amount_str: str) -> float:
+    """Convert amount string to float"""
+    try:
+        return float(amount_str)
+    except:
+        return 0.0
+
+
+def main():
+    """Main function - Get driver balance and last 7 days transactions"""
+    
+    # Your credentials
+    API_KEY = "YCbHdwOubAjSjtClcxEwcOCBzVzWgmCgUs"
+    CLIENT_ID = "taxi/park/475f2435754b428ea9f0f000ef7de1fc"
+    PARK_ID = "475f2435754b428ea9f0f000ef7de1fc"
+    DRIVER_ID = "fad186e2dfee4b4f8e71976d6e9f595c"
+    
+    print("=" * 80)
+    print("🚚 YANGO FLEET API - Driver Transaction Report")
+    print("=" * 80)
+    print(f"\n   Park ID: {PARK_ID}")
+    print(f"   Driver ID: {DRIVER_ID}")
+    
+    # Initialize client
+    client = YangoFleetAPI(API_KEY, CLIENT_ID, PARK_ID)
+    
+    # 1. Get current balance
+    print("\n💰 CURRENT BALANCE")
+    print("-" * 40)
+    
+    balance_data = client.get_blocked_balance(DRIVER_ID)
+    if balance_data:
+        total_balance = float(balance_data.get('balance', 0))
+        blocked_balance = float(balance_data.get('blocked_balance', 0))
+        available_balance = total_balance - blocked_balance
+        
+        print(f"   Total Balance:     ${total_balance:.2f}")
+        print(f"   Blocked Balance:   ${blocked_balance:.2f}")
+        print(f"   Available:         ${available_balance:.2f}")
+        
+        # Show blocked balance breakdown if available
+        if 'details' in balance_data and balance_data['details']:
+            print(f"\n   Blocked Balance Breakdown:")
+            for key, value in balance_data['details'].items():
+                print(f"      • {key}: ${float(value):.2f}")
+    else:
+        print("   ⚠️ Could not fetch balance")
+        total_balance = 0
+        blocked_balance = 0
+        available_balance = 0
+    
+    # 2. Get available transaction categories
+    print("\n📂 TRANSACTION CATEGORIES")
+    print("-" * 40)
+    
+    categories = client.get_transaction_categories(PARK_ID)
+    if categories:
+        print(f"   Found {len(categories)} categories:")
+        for cat in categories[:15]:
+            print(f"      • {cat.get('id', 'N/A')}: {cat.get('name', 'N/A')}")
+    else:
+        print("   ⚠️ Could not fetch categories")
+    
+    # 3. Get last 7 days transactions
+    print("\n📊 LAST 7 DAYS TRANSACTIONS")
+    print("-" * 40)
+    
+    # Calculate date range (last 7 days)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=7)
+    
+    # Format with Moscow timezone (+03:00)
+    start_date_str = start_date.strftime("%Y-%m-%dT00:00:00+03:00")
+    end_date_str = end_date.strftime("%Y-%m-%dT23:59:59+03:00")
+    
+    print(f"   Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    print()
+    
+    # Get all transactions for the period
+    transactions = client.get_all_driver_transactions(
+        driver_profile_id=DRIVER_ID,
+        event_at_from=start_date_str,
+        event_at_to=end_date_str
+    )
+    
+    if transactions:
+        print(f"   ✅ Found {len(transactions)} transactions in last 7 days")
+        print()
+        
+        # Calculate totals
+        total_credits = 0.0
+        total_debits = 0.0
+        category_totals = {}
+        
+        for txn in transactions:
+            amount = format_currency(txn.get('amount', '0'))
+            category = txn.get('category_name', 'Unknown')
+            
+            if amount > 0:
+                total_credits += amount
+            else:
+                total_debits += abs(amount)
+            
+            # Track by category
+            if category not in category_totals:
+                category_totals[category] = {'credits': 0, 'debits': 0, 'count': 0}
+            
+            if amount > 0:
+                category_totals[category]['credits'] += amount
+            else:
+                category_totals[category]['debits'] += abs(amount)
+            category_totals[category]['count'] += 1
+        
+        net_change = total_credits - total_debits
+        
+        # Print summary
+        print("   📈 SUMMARY")
+        print("   " + "-" * 36)
+        print(f"   Total Credits (Income):   +${total_credits:.2f}")
+        print(f"   Total Debits (Deductions): -${total_debits:.2f}")
+        print(f"   Net Change:                 ${net_change:.2f}")
+        print()
+        
+        # Print breakdown by category
+        if category_totals:
+            print("   📂 BREAKDOWN BY CATEGORY")
+            print("   " + "-" * 36)
+            for category, data in sorted(category_totals.items()):
+                net = data['credits'] - data['debits']
+                print(f"\n   • {category}:")
+                print(f"     Credits:  +${data['credits']:.2f}")
+                print(f"     Debits:   -${data['debits']:.2f}")
+                print(f"     Net:      ${net:.2f}")
+                print(f"     Count:    {data['count']} transactions")
+        
+        # Print detailed transaction list
+        print("\n   📋 DETAILED TRANSACTION LIST")
+        print("   " + "-" * 36)
+        
+        # Sort by date (newest first)
+        sorted_txns = sorted(transactions, key=lambda x: x.get('event_at', ''), reverse=True)
+        
+        for i, txn in enumerate(sorted_txns, 1):
+            amount = format_currency(txn.get('amount', '0'))
+            amount_str = f"+${amount:.2f}" if amount > 0 else f"-${abs(amount):.2f}"
+            symbol = "🟢" if amount > 0 else "🔴"
+            
+            print(f"\n   {i}. {symbol} {amount_str} - {txn.get('category_name', 'Unknown')}")
+            print(f"      Date:        {txn.get('event_at', 'N/A')}")
+            print(f"      Description: {txn.get('description', 'N/A')}")
+            print(f"      ID:          {txn.get('id', 'N/A')}")
+            
+            if txn.get('order_id'):
+                print(f"      Order ID:    {txn.get('order_id')}")
+            
+            # Handle created_by which can be one of 4 types
+            created_by = txn.get('created_by', {})
+            if created_by:
+                identity = created_by.get('identity', 'N/A')
+                if identity == 'dispatcher':
+                    print(f"      Created by:  Dispatcher: {created_by.get('dispatcher_name', 'N/A')}")
+                elif identity == 'fleet-api':
+                    print(f"      Created by:  API (key: {created_by.get('key_id', 'N/A')})")
+                elif identity == 'tech-support':
+                    print(f"      Created by:  Tech Support")
+                elif identity == 'platform':
+                    print(f"      Created by:  Platform")
+        
+        # Export to file
+        output = {
+            "driver_id": DRIVER_ID,
+            "park_id": PARK_ID,
+            "report_date": datetime.now().isoformat(),
+            "balance": {
+                "total": total_balance,
+                "blocked": blocked_balance,
+                "available": available_balance
+            },
+            "period": {
+                "start": start_date_str,
+                "end": end_date_str
+            },
+            "summary": {
+                "total_credits": total_credits,
+                "total_debits": total_debits,
+                "net_change": net_change,
+                "transaction_count": len(transactions)
+            },
+            "transactions": transactions
+        }
+        
+        filename = f"driver_{DRIVER_ID}_transactions.json"
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(output, f, indent=2, ensure_ascii=False)
+        print(f"\n   💾 Full report exported to: {filename}")
+        
+    else:
+        print("   ℹ️ No transactions found in the last 7 days")
+        print("\n   Trying last 30 days...")
+        
+        # Try last 30 days
+        start_30 = (end_date - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00+03:00")
+        
+        transactions_30 = client.get_all_driver_transactions(
+            driver_profile_id=DRIVER_ID,
+            event_at_from=start_30,
+            event_at_to=end_date_str
+        )
+        
+        if transactions_30:
+            print(f"   ✅ Found {len(transactions_30)} transactions in last 30 days!")
+            print("\n   Consider running with a larger date range.")
+        else:
+            print("   ❌ No transactions found in last 30 days either.")
+            print("\n   This could mean:")
+            print("   • The driver has no transaction history")
+            print("   • The driver ID may be incorrect")
+            print("   • Transactions may be under a different driver profile")
+    
+    # 4. Final summary
+    print("\n" + "=" * 80)
+    print("✅ REPORT COMPLETE")
+    print("=" * 80)
+    print(f"""
+   Driver ID:       {DRIVER_ID}
+   Park ID:         {PARK_ID}
+   Current Balance: ${total_balance:.2f}
+   Available:       ${available_balance:.2f}
+   Last 7 Days:     {len(transactions) if transactions else 0} transactions
+    """)
+
+
+if __name__ == "__main__":
+    main()

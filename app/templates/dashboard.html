@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | FLOS - Telebirr Simulation{% endblock %}
+
+{% block content %}
+<!-- Secondary Action Bar -->
+<div class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+    <div class="flex space-x-3">
+        <a href="/simulator" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+            Simulate Deposit
+        </a>
+        <button onclick="syncFromYango()" class="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm">
+            <svg class="-ml-1 mr-2 h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Sync from Yango
+        </button>
+        <button onclick="runReconciliation()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm">
+            <svg class="-ml-1 mr-2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Process Batch Recon
+        </button>
+        <button class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-sm">
+            <svg class="-ml-1 mr-2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <span class="text-red-600 font-semibold mr-2">{{ kpis.exceptions_count }}</span> Exceptions
+        </button>
+    </div>
+    <div class="relative max-w-sm w-full">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+        <input type="text" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-full leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Quick find driver...">
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <!-- Expected Revenue -->
+    <div class="bg-white overflow-hidden shadow rounded-xl border border-gray-100">
+        <div class="p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-blue-50 rounded-lg p-3">
+                    <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dt class="text-xs font-semibold text-gray-500 tracking-wider uppercase truncate">Daily Expected Revenue</dt>
+                    <dd class="flex items-baseline">
+                        <div class="text-3xl font-bold text-gray-900 mt-2">{{ "{:,.2f}".format(kpis.total_expected) }} ETB</div>
+                    </dd>
+                </div>
+            </div>
+            <div class="mt-4 text-sm text-gray-500">Based on synced Yango orders</div>
+        </div>
+    </div>
+
+    <!-- Exceptions -->
+    <div class="bg-white overflow-hidden shadow rounded-xl border border-gray-100">
+        <div class="p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-red-50 rounded-lg p-3">
+                    <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dt class="text-xs font-semibold text-gray-500 tracking-wider uppercase truncate">Pending Exceptions</dt>
+                    <dd class="flex items-baseline">
+                        <div class="text-3xl font-bold text-red-600 mt-2">{{ kpis.exceptions_count }}</div>
+                    </dd>
+                </div>
+            </div>
+            <div class="mt-4 text-sm text-gray-500">Missing or partial deposits</div>
+        </div>
+    </div>
+
+    <!-- Total Drivers -->
+    <div class="bg-white overflow-hidden shadow rounded-xl border border-gray-100">
+        <div class="p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-purple-50 rounded-lg p-3">
+                    <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dt class="text-xs font-semibold text-gray-500 tracking-wider uppercase truncate">Total Drivers</dt>
+                    <dd class="flex items-baseline">
+                        <div class="text-3xl font-bold text-gray-900 mt-2">{{ kpis.total_drivers }}</div>
+                    </dd>
+                </div>
+            </div>
+            <div class="mt-4 text-sm text-gray-500">Active fleet operators</div>
+        </div>
+    </div>
+
+    <!-- Verified Base -->
+    <div class="bg-white overflow-hidden shadow rounded-xl border border-gray-100">
+        <div class="p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-indigo-50 rounded-lg p-3">
+                    <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dt class="text-xs font-semibold text-gray-500 tracking-wider uppercase truncate">Verification Rate</dt>
+                    <dd class="flex items-baseline">
+                        <div class="text-3xl font-bold text-gray-900 mt-2">{{ "%.1f"|format(kpis.reconciliation_rate) }}%</div>
+                    </dd>
+                </div>
+            </div>
+            <div class="mt-4 text-sm text-gray-500">Fully reconciled today</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Table Card -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-white">
+        <h3 class="text-lg leading-6 font-semibold text-gray-900">Recent Arrivals & Reconciliation Activity</h3>
+        <span class="text-sm text-gray-500">{{ today.strftime('%m/%d/%Y') }}</span>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Driver Details</th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Expected (ETB)</th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Deposited (ETB)</th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Variance</th>
+                    <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Reconciliation Status</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for item in data %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                                {{ item.driver.name[0] }}
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">{{ item.driver.name }}</div>
+                                <div class="text-sm text-gray-500">{{ item.driver.operator_id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 font-medium">
+                        {{ "{:,.2f}".format(item.expected) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 font-medium">
+                        {{ "{:,.2f}".format(item.actual) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {% set variance = item.actual - item.expected %}
+                        {% if variance < 0 %}
+                            <span class="text-red-600">{{ "{:,.2f}".format(variance) }}</span>
+                        {% elif variance > 0 %}
+                            <span class="text-blue-600">+{{ "{:,.2f}".format(variance) }}</span>
+                        {% else %}
+                            <span class="text-gray-400">0.00</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        {% if item.color == 'green' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                <svg class="mr-1 h-3 w-3 text-green-600" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                Verified Match
+                            </span>
+                        {% elif item.color == 'orange' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">
+                                <svg class="mr-1 h-3 w-3 text-orange-600" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                Partial Deposit
+                            </span>
+                        {% elif item.color == 'red' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                <svg class="mr-1 h-3 w-3 text-red-600" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                Missing Deposit
+                            </span>
+                        {% elif item.color == 'blue' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                <svg class="mr-1 h-3 w-3 text-blue-600" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
+                                Excess Deposit
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                                Pending
+                            </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                        No operations data available for today.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    async function runReconciliation() {
+        try {
+            const response = await fetch('/api/reconciliation/run', { method: 'POST' });
+            const data = await response.json();
+            alert(data.message);
+            window.location.reload();
+        } catch (error) {
+            console.error('Error running reconciliation:', error);
+            alert("Failed to run batch reconciliation.");
+        }
+    }
+
+    async function syncFromYango() {
+        const btn = event.currentTarget;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Syncing...`;
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/api/sync/yango', { method: 'POST' });
+            const data = await response.json();
+            alert(`Sync complete! ${data.drivers_synced} drivers updated, ${data.orders_processed} orders processed.`);
+            window.location.reload();
+        } catch (error) {
+            console.error('Error syncing from Yango:', error);
+            alert("Failed to sync from Yango.");
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+</script>
+{% endblock %}
