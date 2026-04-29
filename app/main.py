@@ -8,8 +8,14 @@ from datetime import date, datetime, timezone
 import uuid
 
 from app.database import create_db_and_tables, get_session
-from app.models import Driver, ExpectedRevenue, TelebirrTransaction, ReconciliationRecord, Order
+from app.models import Driver, ExpectedRevenue, TelebirrTransaction, ReconciliationRecord, Order, User
 from app.services.yango import YangoClient
+
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+from fastapi.responses import RedirectResponse
+from fastapi import Cookie, Response
 
 app = FastAPI(title="FLOS - Telebirr Integration Simulator")
 yango_client = YangoClient()
@@ -22,14 +28,60 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+    # Create default admin if not exists
+    with next(get_session()) as db:
+        admin = db.exec(select(User).where(User.username == "admin")).first()
+        if not admin:
+            hashed_pwd = pwd_context.hash("admin123")
+            admin = User(username="admin", hashed_password=hashed_pwd, full_name="System Admin", role="admin")
+            db.add(admin)
+            db.commit()
+
+# ==========================================
+# AUTHENTICATION HELPERS
+# ==========================================
+
+async def get_current_user(db: Session = Depends(get_session), session_id: str = Cookie(None)):
+    if not session_id:
+        return None
+    user = db.exec(select(User).where(User.username == session_id)).first() # Simple session for now
+    return user
 
 # ==========================================
 # FRONTEND VIEWS
 # ==========================================
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login")
+async def login_submit(
+    response: Response,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_session)
+):
+    user = db.exec(select(User).where(User.username == username)).first()
+    if not user or not pwd_context.verify(password, user.hashed_password):
+        return RedirectResponse(url="/login?error=Invalid credentials", status_code=303)
+    
+    # Set simple cookie session
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(key="session_id", value=user.username, httponly=True)
+    return response
+
+@app.get("/logout")
+async def logout(response: Response):
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("session_id")
+    return response
+
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, search: str = None, db: Session = Depends(get_session)):
+async def dashboard(request: Request, search: str = None, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
     """Main operations dashboard."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
     # Fetch drivers and their latest reconciliation record
     statement = select(Driver)
     if search:
@@ -112,8 +164,10 @@ async def dashboard(request: Request, search: str = None, db: Session = Depends(
     )
 
 @app.get("/simulator", response_class=HTMLResponse)
-async def simulator_view(request: Request, db: Session = Depends(get_session)):
+async def simulator_view(request: Request, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
     """UI to mock a deposit."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
     drivers = db.exec(select(Driver)).all()
     return templates.TemplateResponse(
         request=request,
@@ -124,8 +178,10 @@ async def simulator_view(request: Request, db: Session = Depends(get_session)):
     )
 
 @app.get("/exceptions", response_class=HTMLResponse)
-async def exceptions_view(request: Request, db: Session = Depends(get_session)):
+async def exceptions_view(request: Request, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
     """View only drivers with reconciliation discrepancies and summary stats."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
     drivers = db.exec(select(Driver)).all()
     today = date.today()
     exceptions_data = []
@@ -193,8 +249,10 @@ async def exceptions_view(request: Request, db: Session = Depends(get_session)):
     )
 
 @app.get("/orders", response_class=HTMLResponse)
-async def orders_view(request: Request, search: str = None, db: Session = Depends(get_session), page: int = 1):
+async def orders_view(request: Request, search: str = None, db: Session = Depends(get_session), page: int = 1, user: User = Depends(get_current_user)):
     """View completed orders cached in the database with search."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
     limit = 50
     offset = (page - 1) * limit
     
@@ -218,8 +276,10 @@ async def orders_view(request: Request, search: str = None, db: Session = Depend
     )
 
 @app.get("/internal-drivers", response_class=HTMLResponse)
-async def internal_drivers_view(request: Request, search: str = None, db: Session = Depends(get_session)):
+async def internal_drivers_view(request: Request, search: str = None, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
     """View dedicated only to internal drivers."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
     statement = select(Driver).where(Driver.driver_type == "internal")
     if search:
         statement = statement.where(
@@ -236,8 +296,10 @@ async def internal_drivers_view(request: Request, search: str = None, db: Sessio
     )
 
 @app.get("/drivers/{driver_id}", response_class=HTMLResponse)
-async def driver_detail_view(request: Request, driver_id: int, db: Session = Depends(get_session)):
+async def driver_detail_view(request: Request, driver_id: int, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
     """Deep dive into a specific driver's performance and reconciliation."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
     driver = db.get(Driver, driver_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")

@@ -2,6 +2,14 @@ from datetime import datetime, date
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, index=True)
+    hashed_password: str
+    full_name: Optional[str] = None
+    role: str = Field(default="manager") # manager, auditor, etc.
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
 class Driver(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     operator_id: str = Field(unique=True, index=True)
