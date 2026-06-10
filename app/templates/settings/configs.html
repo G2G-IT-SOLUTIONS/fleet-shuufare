@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Configurations | FLOS{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 mt-6">
+    <div class="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
+        <div>
+            <h3 class="text-base font-semibold text-gray-900">System Configurations</h3>
+            <p class="text-xs text-gray-500 mt-1">Operational settings that control the behavior of the fleet dashboard.</p>
+        </div>
+    </div>
+    
+    <div class="p-6">
+        <form action="/api/configs/update" method="POST">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {% for conf in configs %}
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <label class="block text-sm font-semibold text-gray-800 mb-1">{{ conf.key }}</label>
+                    <p class="text-xs text-gray-500 mb-3 h-8">{{ conf.description }}</p>
+                    <input type="{% if conf.data_type == 'int' %}number{% else %}text{% endif %}" 
+                           name="{{ conf.key }}" 
+                           value="{{ conf.value }}" 
+                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border">
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="mt-8 flex justify-end">
+                <button type="submit" class="inline-flex justify-center py-2.5 px-6 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                    Save Configurations
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success')) {
+        alert('Configurations saved successfully!');
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+</script>
+{% endblock %}

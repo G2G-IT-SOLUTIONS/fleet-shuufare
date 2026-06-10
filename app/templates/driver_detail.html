@@ -1,162 +1,3156 @@
 {% extends "base.html" %}
+{% block title %}{{ driver.name }} — Driver Detail | FLOS{% endblock %}
+{% block extra_head %}
+<!-- Flatpickr for date range selection -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<style>
+  /* Custom Flatpickr styling to match the theme */
+  .flatpickr-calendar {
+    border-radius: 12px !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid #e5e7eb !important;
+    font-family: 'Outfit', sans-serif !important;
+  }
+  .flatpickr-day.selected {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+  }
+  .flatpickr-day.inRange {
+    background: #eff6ff !important;
+    border-color: #eff6ff !important;
+    box-shadow: -5px 0 0 #eff6ff, 5px 0 0 #eff6ff !important;
+  }
 
-{% block title %}{{ driver.name }} - Driver Detail | FLOS{% endblock %}
+  /* Modern Interactive Puzzle Loading Animation */
+  @keyframes puzzle-assemble {
+    0% {
+      transform: translate(0, 0);
+    }
+    35% {
+      transform: translate(var(--dx), var(--dy));
+    }
+    45% {
+      transform: translate(var(--dx), var(--dy)) scale(0.92);
+    }
+    55% {
+      transform: translate(var(--dx), var(--dy)) scale(0.92) rotate(4deg);
+    }
+    70%, 100% {
+      transform: translate(0, 0);
+    }
+  }
+
+  .puzzle-piece {
+    animation: puzzle-assemble 5s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+    transform-origin: center;
+    transition: filter 0.3s ease;
+  }
+
+  .puzzle-piece:hover {
+    filter: brightness(1.1) saturate(1.1);
+  }
+
+  .puzzle-piece.top-left {
+    --dx: -16px;
+    --dy: -16px;
+    animation-delay: 0s;
+  }
+
+  .puzzle-piece.top-right {
+    --dx: 16px;
+    --dy: -16px;
+    animation-delay: 0.15s;
+  }
+
+  .puzzle-piece.bottom-left {
+    --dx: -16px;
+    --dy: 16px;
+    animation-delay: 0.3s;
+  }
+
+  .puzzle-piece.bottom-right {
+    --dx: 16px;
+    --dy: 16px;
+    animation-delay: 0.45s;
+  }
+
+  @keyframes pulse-slow {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.12); opacity: 0.65; }
+  }
+  .animate-pulse-slow {
+    animation: pulse-slow 5s ease-in-out infinite;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="mb-8 flex items-center justify-between">
-    <div class="flex items-center space-x-4">
-        <a href="/" class="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-400">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-        </a>
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">{{ driver.name }}</h1>
-            <p class="text-sm text-gray-500">Driver Profile & Financial Oversight</p>
-        </div>
-    </div>
-    <div class="flex space-x-2">
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-            ID: {{ driver.operator_id }}
-        </span>
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {% if driver.driver_type == 'internal' %}bg-purple-100 text-purple-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-            {{ driver.driver_type|upper }}
-        </span>
-    </div>
-</div>
 
-<!-- KPI Summary -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <p class="text-sm font-medium text-gray-500 mb-1">Expected (Today)</p>
-        <p class="text-2xl font-bold text-gray-900">{{ "{:,.2f}".format(kpis.today_expected) }} ETB</p>
-    </div>
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-green-500">
-        <p class="text-sm font-medium text-gray-500 mb-1">Total Deposited</p>
-        <p class="text-2xl font-bold text-gray-900">{{ "{:,.2f}".format(kpis.total_actual) }} ETB</p>
-    </div>
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-orange-500">
-        <p class="text-sm font-medium text-gray-500 mb-1">Total Variance</p>
-        <p class="text-2xl font-bold text-red-600">{{ "{:,.2f}".format(kpis.variance) }} ETB</p>
-    </div>
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <p class="text-sm font-medium text-gray-500 mb-1">Compliance Rate</p>
-        <div class="flex items-center">
-            <p class="text-2xl font-bold text-gray-900">{{ "{:.1f}%".format(kpis.compliance) }}</p>
-            <div class="ml-4 flex-grow bg-gray-100 rounded-full h-2 max-w-[100px]">
-                <div class="bg-green-500 h-2 rounded-full" style="width: {{ kpis.compliance }}%"></div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- Profile & Reconciliation History -->
-    <div class="lg:col-span-2 space-y-8">
-        <!-- Reconciliation History Table -->
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 class="text-sm font-bold text-gray-900 uppercase">Reconciliation History</h3>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-white">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
-                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Expected</th>
-                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actual</th>
-                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        {% for r in reconciliations %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ r.date }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">{{ "{:,.2f}".format(r.expected_amount) }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-green-600">{{ "{:,.2f}".format(r.actual_amount) }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase 
-                                    {% if r.status == 'Verified' %}bg-green-100 text-green-800
-                                    {% elif r.status == 'Missing Deposit' %}bg-red-100 text-red-800
-                                    {% else %}bg-orange-100 text-orange-800{% endif %}">
-                                    {{ r.status }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500 italic">No reconciliation records found.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div class="flex flex-col gap-6 max-w-full overflow-x-hidden">
+  <!-- Odoo Control Panel Header -->
+  <div class="mb-4 bg-white border border-gray-200 rounded shadow-sm py-3.5 px-6 flex items-center justify-between">
+    <!-- Breadcrumbs navigation -->
+    <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold select-none">
+      <a href="/drivers" class="hover:text-[#f97316] transition-colors">Drivers</a>
+      <span class="text-gray-300">/</span>
+      <span class="text-gray-800 font-bold" id="breadcrumb-driver-name">{{ driver.name }}</span>
+    </div>
+  </div>
 
-        <!-- Telebirr Transaction History -->
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 class="text-sm font-bold text-gray-900 uppercase text-blue-600">Telebirr Deposits</h3>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-white">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Transaction ID</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Timestamp</th>
-                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Amount (ETB)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        {% for tx in transactions %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">{{ tx.transaction_id }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">{{ "{:,.2f}".format(tx.amount) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500 italic">No Telebirr deposits recorded.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+  <!-- Odoo Main Record Sheet -->
+  <div class="bg-white border border-gray-300 rounded shadow-sm mb-6 overflow-hidden">
+    <!-- Status Bar Header -->
+    <div class="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-wrap gap-4 select-none">
+      <!-- Left: Workflow Action Buttons -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="btn-sync-orders" onclick="openDriverSyncWizard()" class="flex items-center gap-1.5 px-3 py-1.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded shadow-sm transition-all active:scale-95">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Sync Latest Orders
+        </button>
+        <button onclick="openResolveModal('', 'Pending', '')" class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold uppercase rounded shadow-sm transition-all active:scale-95">
+          Log Manual Resolution
+        </button>
+        <button onclick="toggleType()" class="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold uppercase rounded shadow-sm transition-all active:scale-95">
+          Mark as {% if driver.driver_type == 'internal' %}External{% else %}Internal{% endif %}
+        </button>
+      </div>
+      
+      <!-- Right: Chevron Stage Tracker -->
+      <div class="flex items-center text-xs font-bold">
+        {% set cur_status = yango_profile.profile.work_status if yango_profile and yango_profile.profile else 'offline' %}
+        <div class="flex items-center odoo-stages bg-gray-100 rounded border border-gray-200 overflow-hidden shadow-inner font-bold">
+          <span class="px-3.5 py-1.5 flex items-center gap-1 transition-all {% if driver.driver_type == 'external' %}bg-[#f97316] text-white{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+            External
+          </span>
+          <span class="px-3.5 py-1.5 border-l border-gray-200 flex items-center gap-1 transition-all {% if driver.driver_type == 'internal' and cur_status == 'offline' %}bg-[#f97316] text-white{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+            Internal (Offline)
+          </span>
+          <span class="px-3.5 py-1.5 border-l border-gray-200 flex items-center gap-1 transition-all {% if driver.driver_type == 'internal' and cur_status == 'working' %}bg-emerald-600 text-white animate-pulse{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full {% if cur_status == 'working' %}bg-white{% else %}bg-gray-300{% endif %}"></span>
+            Internal (Live Active)
+          </span>
         </div>
+      </div>
     </div>
 
-    <!-- Sidebar Info -->
-    <div class="space-y-6">
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Contact Information</h4>
-            <div class="space-y-4">
-                <div>
-                    <p class="text-xs text-gray-400">Phone Number</p>
-                    <p class="text-sm font-medium">{{ driver.phone or "Not provided" }}</p>
-                </div>
-                <div>
-                    <p class="text-xs text-gray-400">Yango ID (Operator)</p>
-                    <p class="text-sm font-mono">{{ driver.operator_id }}</p>
-                </div>
-                <div>
-                    <p class="text-xs text-gray-400">Registration Date</p>
-                    <p class="text-sm font-medium">{{ driver.created_at.strftime('%B %d, %Y') }}</p>
-                </div>
-            </div>
-        </div>
+    <!-- Padding wrapper for sheet contents -->
+    <div class="p-6 flex flex-col gap-6">
 
-        <div class="bg-purple-600 p-6 rounded-xl shadow-lg text-white">
-            <h4 class="text-xs font-bold text-purple-200 uppercase tracking-widest mb-4">Fleet Management</h4>
-            <p class="text-sm mb-4">This driver is currently marked as <strong>{{ driver.driver_type|upper }}</strong>.</p>
-            <form action="/api/drivers/update-type" method="POST" class="space-y-3">
-                <input type="hidden" name="driver_id" value="{{ driver.id }}">
-                <select name="driver_type" class="w-full bg-purple-700 border-purple-500 text-white rounded-md text-sm p-2 focus:ring-purple-400">
-                    <option value="internal" {% if driver.driver_type == 'internal' %}selected{% endif %}>Internal Driver</option>
-                    <option value="external" {% if driver.driver_type == 'external' %}selected{% endif %}>External Driver</option>
-                </select>
-                <button type="submit" class="w-full bg-white text-purple-700 font-bold py-2 rounded-md hover:bg-purple-50 transition-colors text-sm">
-                    Update Type
+      <!-- Identity block (Avatar, Name, Status badges) -->
+      <div class="flex items-center gap-5">
+        <div class="relative group/avatar flex-shrink-0">
+          <div id="avatar-container" class="dd-avatar w-20 h-24 bg-[#f97316]/10 border-2 border-[#f97316]/20 rounded-lg text-[#f97316] flex items-center justify-center text-4xl font-black uppercase shadow-inner transition-colors group-hover/avatar:bg-[#f97316]/20 select-none overflow-hidden relative">
+            {% if driver.avatar_data %}
+              <img id="avatar-img" src="{{ driver.avatar_data }}" class="w-full h-full object-cover">
+            {% else %}
+              <span id="avatar-initials">{{ driver.name[0]|upper }}</span>
+            {% endif %}
+            
+            <!-- Hover overlay for uploading avatar -->
+            <div onclick="triggerAvatarUpload(event)" class="absolute inset-0 bg-black/45 flex items-center justify-center cursor-pointer opacity-0 group-hover/avatar:opacity-100 transition-all duration-200 text-white" title="Upload Photo">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <!-- Hidden file input -->
+          <input type="file" id="avatar-file-input" accept="image/*" class="hidden" onchange="handleAvatarFile(this)">
+          
+          <div onclick="toggleNameEdit()" class="absolute -bottom-1 -right-1 bg-white border border-gray-200 rounded-full p-1.5 shadow-md flex items-center justify-center cursor-pointer opacity-0 group-hover/avatar:opacity-100 transition-all hover:text-[#f97316] z-10">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+          </div>
+          
+          <!-- Big preview card on hover -->
+          <div id="avatar-preview-container" class="absolute left-24 top-0 ml-4 w-48 h-56 bg-white border border-gray-150 rounded-xl shadow-2xl p-1 z-30 pointer-events-none opacity-0 scale-90 group-hover/avatar:opacity-100 group-hover/avatar:scale-100 transition-all duration-250 ease-out origin-left flex flex-col justify-between">
+            <div id="preview-image-wrap" class="w-full h-full rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center border border-gray-100">
+              {% if driver.avatar_data %}
+                <img id="avatar-preview-img" src="{{ driver.avatar_data }}" class="w-full h-full object-cover">
+              {% else %}
+                <span id="avatar-preview-initials" class="text-6xl font-black text-[#f97316]/20 uppercase">{{ driver.name[0]|upper }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 id="driver-name-display" class="text-3xl font-black text-gray-900 leading-none tracking-tight select-all oe_title mb-1">{{ driver.name }}</h1>
+            <button onclick="toggleNameEdit()" class="p-1 text-gray-400 hover:text-[#f97316] transition-all hover:scale-110" title="Edit Name">
+              <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+            </button>
+          </div>
+          
+          <div id="driver-name-edit-wrap" class="hidden items-center gap-2 mt-1.5">
+            <input type="text" id="driver-name-input" value="{{ driver.name }}" class="bg-white border border-gray-300 text-gray-900 rounded px-2.5 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#f97316] w-64 font-semibold shadow-sm">
+            <button onclick="saveDriverName()" class="bg-[#f97316] hover:bg-[#ea580c] text-white rounded px-3 py-1 text-xs font-bold transition-colors shadow-sm">Save</button>
+            <button onclick="toggleNameEdit()" class="text-gray-500 text-xs font-bold hover:text-gray-700 transition-colors">Cancel</button>
+          </div>
+          
+          <div class="flex items-center gap-2 mt-2">
+            <span class="px-2.5 py-0.5 bg-[#f97316]/5 text-[#f97316] border border-[#f97316]/15 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm select-none">{{ driver.driver_type }}</span>
+            {% if yango_profile %}
+              {% set ws = yango_profile.profile.work_status if yango_profile.profile else 'unknown' %}
+              {% set ws_class = 'bg-emerald-50 text-emerald-700 border-emerald-250' if ws == 'working' else 'bg-gray-100 text-gray-500 border-gray-200' %}
+              <span class="px-2.5 py-0.5 border rounded text-[10px] font-bold uppercase tracking-wider {{ ws_class }} shadow-sm select-none">LIVE: {{ ws }}</span>
+            {% endif %}
+          </div>
+        </div>
+        
+        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0 select-none">
+          Created: {{ driver.created_at.strftime('%Y-%m-%d') }}
+        </div>
+      </div>
+
+      <!-- Properties Fields (Two Column Table-like grid) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-4 border-t border-gray-250 text-sm">
+        
+        <!-- Left Column: Identity & Cutoffs -->
+        <div class="space-y-3.5">
+          <div class="grid grid-cols-[140px_1fr] items-center gap-2 border-b border-gray-100 pb-2">
+            <span class="text-gray-400 font-bold text-xs uppercase tracking-wider">Registered Phone</span>
+            <span class="text-gray-800 font-semibold">{{ driver.phone or '—' }}</span>
+          </div>
+
+          <div class="grid grid-cols-[140px_1fr] items-center gap-2 border-b border-gray-100 pb-2 group relative">
+            <span class="text-gray-400 font-bold text-xs uppercase tracking-wider">Operating Shift</span>
+            <div class="flex items-center gap-2">
+              <div id="shift-view" class="flex items-center gap-2">
+                <span id="shift-display" class="font-bold">
+                  {% if driver.shift == 'Day' %}
+                    <span class="text-yellow-650">Day</span>
+                  {% elif driver.shift == 'Night' %}
+                    <span class="text-gray-850 bg-gray-105 px-1 rounded">Night</span>
+                  {% else %}
+                    <span class="text-gray-400 font-normal">None</span>
+                  {% endif %}
+                </span>
+                <button onclick="toggleShiftEdit()" class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
-            </form>
+              </div>
+              <div id="shift-edit-wrap" class="hidden items-center gap-1.5 w-full">
+                <select id="shift-input" class="bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#f97316] font-semibold text-gray-850">
+                  <option value="None" {% if driver.shift == 'None' %}selected{% endif %}>None</option>
+                  <option value="Day" {% if driver.shift == 'Day' %}selected{% endif %}>Day</option>
+                  <option value="Night" {% if driver.shift == 'Night' %}selected{% endif %}>Night</option>
+                </select>
+                <button onclick="saveShift()" class="bg-[#f97316] hover:bg-[#ea580c] text-white rounded px-2 py-0.5 text-xs font-bold transition-colors">Set</button>
+                <button onclick="toggleShiftEdit()" class="text-gray-400 hover:text-gray-600 text-xs font-bold">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-[140px_1fr] items-center gap-2 border-b border-gray-100 pb-2 group relative">
+            <span class="text-gray-400 font-bold text-xs uppercase tracking-wider">Recon Cutoff</span>
+            <div class="flex items-center gap-2">
+              <div id="recon-date-view" class="flex items-center gap-2">
+                <span id="recon-date-display" class="font-bold">
+                  {% if driver.reconciliation_start_date %}
+                    <span class="text-emerald-700">{{ driver.reconciliation_start_date }}</span>
+                  {% else %}
+                    <span class="text-gray-400 font-normal text-xs">Always (No cutoff)</span>
+                  {% endif %}
+                </span>
+                <button onclick="toggleReconDateEdit()" class="text-gray-400 hover:text-gray-650 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <div id="recon-date-edit-wrap" class="hidden items-center gap-1.5 w-full">
+                <input type="text" id="recon-date-input" value="{{ driver.reconciliation_start_date or '' }}" placeholder="YYYY-MM-DD" class="bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#f97316] font-semibold text-gray-850 w-28 cursor-pointer" readonly>
+                <button onclick="saveReconDate()" class="bg-[#f97316] hover:bg-[#ea580c] text-white rounded px-2 py-0.5 text-xs font-bold transition-colors">Set</button>
+                <button onclick="toggleReconDateEdit()" class="text-gray-400 hover:text-gray-600 text-xs font-bold">Cancel</button>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- Right Column: System Identifiers -->
+        <div class="space-y-3.5">
+          <div class="grid grid-cols-[140px_1fr] items-center gap-2 border-b border-gray-100 pb-2 group">
+            <span class="text-gray-400 font-bold text-xs uppercase tracking-wider">Yango Driver ID</span>
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-gray-700 font-mono text-xs truncate" title="{{ driver.yango_driver_id }}">{{ driver.yango_driver_id }}</span>
+              <button onclick="copyToClipboard('{{ driver.yango_driver_id }}', this)" class="text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 flex-shrink-0" title="Copy">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 012-2v-8a2 2 0 01-2-2h-8a2 2 0 01-2 2v8a2 2 0 012 2z"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-[140px_1fr] items-center gap-2 border-b border-gray-100 pb-2 group relative">
+            <span class="text-gray-400 font-bold text-xs uppercase tracking-wider">Operator ID</span>
+            <div class="flex items-center gap-2">
+              <div id="operator-id-view" class="flex items-center gap-2">
+                <span id="operator-id-display" class="font-semibold text-gray-800 font-mono">{{ driver.operator_id or '000-000' }}</span>
+                <button onclick="toggleOperatorEdit()" class="text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <div id="operator-id-edit-wrap" class="hidden items-center gap-1.5 w-full">
+                <input type="text" id="operator-id-input" value="{{ driver.operator_id or '000-000' }}" class="bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#f97316] font-semibold text-gray-850 w-28 font-mono">
+                <button onclick="saveOperatorId()" class="bg-[#f97316] hover:bg-[#ea580c] text-white rounded px-2 py-0.5 text-xs font-bold transition-colors">Set</button>
+                <button onclick="toggleOperatorEdit()" class="text-gray-400 hover:text-gray-600 text-xs font-bold">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-[140px_1fr] items-center gap-2 border-b border-gray-100 pb-2">
+            <span class="text-gray-400 font-bold text-xs uppercase tracking-wider">Internal ID</span>
+            <span class="text-gray-800 font-bold">#{{ driver.id }}</span>
+          </div>
     </div>
+  </div>
+
+  <!-- Ledger Account Summary Banner -->
+  <div class="bg-gradient-to-r {% if ledger.color == 'red' %}from-red-50 to-red-100/50 border-red-200{% elif ledger.color == 'green' %}from-emerald-50 to-emerald-100/50 border-emerald-200{% else %}from-gray-50 to-gray-100/50 border-gray-200{% endif %} border rounded-xl p-5 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm transition-all duration-300 hover:shadow-md">
+    <div class="flex items-center gap-4">
+      <div class="p-3.5 rounded-lg {% if ledger.color == 'red' %}bg-red-500/10 text-red-650{% elif ledger.color == 'green' %}bg-emerald-500/10 text-emerald-650{% else %}bg-gray-500/10 text-gray-650{% endif %} flex-shrink-0">
+        {% if ledger.color == 'red' %}
+          <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        {% elif ledger.color == 'green' %}
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        {% else %}
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        {% endif %}
+      </div>
+      <div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 class="text-base font-bold text-gray-900 leading-none">Driver Ledger Account</h2>
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border {% if ledger.color == 'red' %}bg-red-100 border-red-200 text-red-700{% elif ledger.color == 'green' %}bg-emerald-100 border-emerald-200 text-emerald-700{% else %}bg-gray-100 border-gray-200 text-gray-700{% endif %}">
+            {{ ledger.status }}
+          </span>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">
+          {% if ledger.color == 'red' %}
+            Driver has an outstanding debt of ETB {{ "{:,.2f}".format(ledger.balance|abs) }} for completed shifts.
+          {% elif ledger.color == 'green' %}
+            Driver has a prepaid credit surplus of ETB {{ "{:,.2f}".format(ledger.balance) }}.
+          {% else %}
+            Driver accounts are perfectly settled and clear.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="flex gap-4 md:gap-8 items-center bg-white/60 backdrop-blur-xs border border-white/40 px-5 py-3.5 rounded-lg shadow-xs/10 w-full md:w-auto">
+      <div class="flex flex-col">
+        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Cash Due</span>
+        <span class="text-sm font-black text-gray-800 font-mono">{{ "{:,.2f}".format(ledger.total_expected) }} <span class="text-[10px] font-bold text-gray-400">ETB</span></span>
+      </div>
+      <div class="w-px h-8 bg-gray-200"></div>
+      <div class="flex flex-col">
+        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Deposited</span>
+        <span class="text-sm font-black text-emerald-600 font-mono">{{ "{:,.2f}".format(ledger.total_deposited) }} <span class="text-[10px] font-bold text-emerald-400">ETB</span></span>
+      </div>
+      <div class="w-px h-8 bg-gray-200"></div>
+      <div class="flex flex-col">
+        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ledger Balance</span>
+        <span class="text-base font-black font-mono {% if ledger.color == 'red' %}text-red-650{% elif ledger.color == 'green' %}text-emerald-600{% else %}text-gray-500{% endif %}">
+          {{ "{:+.2f}".format(ledger.balance) }} <span class="text-[10px] font-bold text-gray-400">ETB</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Metrics Panel -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-px bg-gray-200 border border-gray-300 rounded-lg shadow-sm overflow-hidden mb-6 select-none">
+    <!-- Expected (Today) -->
+    <div class="bg-gray-50/50 p-3 flex flex-col justify-between">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5 mb-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse"></span>
+        Expected (Today)
+      </div>
+      <div class="text-base font-black text-gray-900 font-mono tracking-tight leading-none">
+        {{ "{:,.2f}".format(kpis.today_expected) }} <span class="text-[9px] font-bold text-gray-400 uppercase">ETB</span>
+      </div>
+    </div>
+
+    <!-- Total Expected -->
+    <div class="bg-white p-3 flex flex-col justify-between">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Total Expected</div>
+      <div class="text-base font-black text-gray-900 font-mono tracking-tight leading-none">
+        {{ "{:,.2f}".format(kpis.total_expected) }} <span class="text-[9px] font-bold text-gray-400 uppercase">ETB</span>
+      </div>
+    </div>
+
+    <!-- Total Deposited -->
+    <div class="bg-white p-3 flex flex-col justify-between">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Total Deposited</div>
+      <div class="text-base font-black text-emerald-600 font-mono tracking-tight leading-none">
+        {{ "{:,.2f}".format(kpis.total_actual) }} <span class="text-[9px] font-bold text-emerald-400 uppercase">ETB</span>
+      </div>
+    </div>
+
+    <!-- Total Variance -->
+    <div onclick="switchTab('reconciliation')" class="bg-white p-3 flex flex-col justify-between cursor-pointer hover:bg-gray-50/80 transition-colors group">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center justify-between">
+        <span>Total Variance</span>
+        <svg class="w-3 h-3 text-gray-300 group-hover:text-[#f97316] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+      </div>
+      <div class="text-base font-black font-mono tracking-tight leading-none {% if kpis.variance < -0.01 %}text-red-650{% elif kpis.variance > 0.01 %}text-blue-600{% else %}text-gray-500{% endif %}">
+        {% if kpis.variance > 0 %}+{% endif %}{{ "{:,.2f}".format(kpis.variance) }} <span class="text-[9px] font-bold text-gray-400 uppercase">ETB</span>
+      </div>
+    </div>
+
+    <!-- Compliance Rate -->
+    <div onclick="switchTab('kpis')" class="bg-white p-3 flex flex-col justify-between cursor-pointer hover:bg-gray-50/80 transition-colors group">
+      <div class="flex justify-between items-baseline mb-0.5">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Compliance</div>
+        <div class="text-xs font-black {% if kpis.compliance >= 80 %}text-emerald-600{% elif kpis.compliance >= 50 %}text-amber-500{% else %}text-red-650{% endif %} leading-none">
+          {{ "{:.1f}".format(kpis.compliance) }}%
+        </div>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-1 mt-1 overflow-hidden">
+        <div class="h-full rounded-full {% if kpis.compliance >= 80 %}bg-emerald-500{% elif kpis.compliance >= 50 %}bg-amber-400{% else %}bg-red-500{% endif %}" style="width: {{ [kpis.compliance, 100]|min }}%"></div>
+      </div>
+    </div>
+
+    <!-- Yango Orders -->
+    <div onclick="switchTab('orders')" class="bg-white p-3 flex flex-col justify-between cursor-pointer hover:bg-gray-50/80 transition-colors group">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center justify-between">
+        <span>Yango Orders</span>
+        <svg class="w-3 h-3 text-gray-300 group-hover:text-[#f97316] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+      </div>
+      <div class="text-base font-black text-gray-900 font-mono tracking-tight leading-none">
+        {{ db_trips|length }} <span class="text-[9px] font-bold text-gray-400 uppercase">Trips</span>
+      </div>
+    </div>
+
+    <!-- Telebirr Deposits -->
+    <div onclick="switchTab('deposits')" class="bg-white p-3 flex flex-col justify-between cursor-pointer hover:bg-gray-50/80 transition-colors group">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center justify-between">
+        <span>Deposits</span>
+        <svg class="w-3 h-3 text-gray-300 group-hover:text-[#f97316] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+      </div>
+      <div class="text-base font-black text-gray-900 font-mono tracking-tight leading-none">
+        {{ transactions|length }} <span class="text-[9px] font-bold text-gray-400 uppercase">TXs</span>
+      </div>
+    </div>
+
+    <!-- Total Earnings -->
+    <div onclick="switchTab('kpis')" class="bg-white p-3 flex flex-col justify-between cursor-pointer hover:bg-gray-50/80 transition-colors group">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center justify-between">
+        <span>Total Earnings</span>
+        <svg class="w-3 h-3 text-gray-300 group-hover:text-[#f97316] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+      </div>
+      <div class="text-base font-black text-gray-900 font-mono tracking-tight leading-none">
+        {{ "{:,.2f}".format(kpis.total_made) }} <span class="text-[9px] font-bold text-gray-400 uppercase">ETB</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content: Full-width tabs -->
+  <div class="min-w-0">
+    <!-- Odoo Tabs -->
+    <div class="flex flex-wrap border-b border-gray-200 mb-5" id="dd-tabs">
+      <button class="px-4 py-2.5 text-xs font-bold text-[#f97316] border-b-2 border-[#f97316] transition-all tab-btn active" data-tab="orders">Orders</button>
+      <button class="px-4 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-850 border-b-2 border-transparent transition-all tab-btn" data-tab="reconciliation">Reconciliation</button>
+      <button class="px-4 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-850 border-b-2 border-transparent transition-all tab-btn" data-tab="deposits">Telebirr Deposits</button>
+      <button class="px-4 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-850 border-b-2 border-transparent transition-all tab-btn" data-tab="details">Driver Details</button>
+      <button class="px-4 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-850 border-b-2 border-transparent transition-all tab-btn" data-tab="kpis">KPIs</button>
+      <button class="px-4 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-850 border-b-2 border-transparent transition-all tab-btn" data-tab="documents">Documents</button>
+    </div>
+
+    <!-- Orders Tab (Local DB) -->
+    <div class="tab-pane active mt-4" id="tab-orders">
+      <!-- Daily Shift Reconciliation Summary Widget -->
+      <div class="bg-white border border-gray-300 rounded shadow-sm overflow-hidden mb-5">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <!-- Icon based on driver shift config -->
+            {% if driver.shift == 'Day' %}
+              <span class="p-1 rounded-full bg-amber-50 text-amber-500" title="Day Shift">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464-5.636a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-5.636 4.364a1 1 0 10-1.414-1.414l-.707.707a1 1 0 101.414 1.414l.707-.707zM11 17a1 1 0 11-2 0v-1a1 1 0 112 0v1zm4.364-5.636a1 1 0 101.414-1.414l-.707-.707a1 1 0 10-1.414 1.414l.707.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1zm2.364-5.636a1 1 0 00-1.414 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707z"></path></svg>
+              </span>
+            {% elif driver.shift == 'Night' %}
+              <span class="p-1 rounded-full bg-indigo-50 text-indigo-500" title="Night Shift">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+              </span>
+            {% else %}
+              <span class="p-1 rounded-full bg-gray-50 text-gray-400" title="Unassigned Shift">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              </span>
+            {% endif %}
+            <h3 class="text-xs font-bold text-gray-750 uppercase tracking-wider">Daily Shift Reconciliation (Latest 5 Days)</h3>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-[10px] font-semibold text-gray-500">Configured: <strong class="text-gray-700">{{ driver.shift }} Shift</strong></span>
+            <button onclick="switchTab('reconciliation')" class="text-[10px] font-bold text-[#f97316] hover:text-[#ea580c] transition-colors flex items-center gap-1">
+              <span>View Full History</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm text-gray-700">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-250">
+                <th class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Shift Date</th>
+                <th class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Expected (ETB)</th>
+                <th class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Deposited (ETB)</th>
+                <th class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Net Balance (ETB)</th>
+                <th class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center">Trips / Deposits</th>
+                <th class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right w-24">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 bg-white">
+            {% for r in reconciliations[:5] %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="px-4 py-2.5 text-xs text-gray-600 font-mono whitespace-nowrap flex items-center gap-2">
+                  {% if driver.shift == 'Day' %}
+                    <span class="text-amber-500" title="Day Shift">☀️</span>
+                  {% elif driver.shift == 'Night' %}
+                    <span class="text-indigo-500" title="Night Shift">🌙</span>
+                  {% else %}
+                    <span class="text-gray-400" title="Unassigned">⚙️</span>
+                  {% endif %}
+                  {{ r.date }}
+                </td>
+                <td class="px-4 py-2.5 text-xs font-bold text-gray-800 text-right font-mono">{{ "{:,.2f}".format(r.expected_amount) }}</td>
+                <td class="px-4 py-2.5 text-xs font-bold text-emerald-700 text-right font-mono">{{ "{:,.2f}".format(r.actual_amount) }}</td>
+                <td class="px-4 py-2.5 text-xs font-bold text-right font-mono {% if r.balance < -0.01 %}text-red-600{% elif r.balance > 0.01 %}text-emerald-600{% else %}text-gray-500{% endif %}">
+                  {{ "{:+.2f}".format(r.balance) }}
+                </td>
+                <td class="px-4 py-2.5 text-xs text-gray-500 text-center font-mono">
+                  {{ r.trips_count }} trips / {{ r.txs_count }} txs
+                </td>
+                <td class="px-4 py-2.5 whitespace-nowrap">
+                  {% if r.status == 'Verified' %}
+                    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold uppercase tracking-wider">Verified</span>
+                  {% elif r.status == 'Missing Deposit' %}
+                    <span class="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded text-[10px] font-bold uppercase tracking-wider">Missing Deposit</span>
+                  {% else %}
+                    <span class="px-2 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded text-[10px] font-bold uppercase tracking-wider">{{ r.status }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 whitespace-nowrap text-right text-xs">
+                  {% if r.expected_amount > 0 and r.status != 'Verified' %}
+                    <button onclick="openMarkShiftPaidModal('{{ r.date }}', '{{ driver.shift }}', {{ r.expected_amount }}, {{ r.actual_amount }})" class="px-2 py-0.5 border border-[#f97316]/50 hover:border-[#f97316] text-[10px] font-bold uppercase rounded bg-orange-50/50 hover:bg-orange-100 text-[#f97316] transition-all active:scale-95">Mark Paid</button>
+                  {% else %}
+                    <span class="text-[10px] font-bold uppercase text-gray-400">N/A</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="7" class="px-4 py-8 text-center text-xs text-gray-500 font-semibold">
+                  No shift reconciliation records available. Complete and sync trips to see status.
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Odoo unified Search Bar for Orders Tab -->
+      <div class="flex items-center justify-center gap-3 mb-4 p-3 bg-white border border-gray-300 rounded shadow-sm">
+        <div class="flex-grow max-w-2xl relative" id="orders-search-wrapper">
+          <div class="relative flex items-center border border-gray-300 rounded bg-[#f8f9fa] focus-within:bg-white focus-within:ring-1 focus-within:ring-[#f97316] focus-within:border-[#f97316] transition-all min-h-[34px] py-0.5 px-2">
+            <span class="text-gray-400 mr-2 flex-shrink-0">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </span>
+            
+            <!-- Dynamic Active Filter Pills Container -->
+            <div id="orders-pills-container" class="flex flex-wrap items-center gap-1.5 flex-grow mr-1 max-w-[85%]">
+              <!-- Pills will be dynamically rendered here via Javascript -->
+              <input type="text" id="orders-search-input" placeholder="Search Order ID or Pickup Address..." class="bg-transparent border-none focus:ring-0 text-xs py-1 px-1 text-gray-700 placeholder-gray-400 font-semibold outline-none flex-grow min-w-[150px]">
+            </div>
+
+            <!-- Caret Button to Toggle Dropdown Menu -->
+            <button type="button" id="orders-dropdown-toggle-btn" class="ml-auto text-gray-400 hover:text-gray-600 focus:outline-none pl-2 border-l border-gray-200 h-5 flex items-center">
+              <svg class="h-3.5 w-3.5 transition-transform duration-200" id="orders-caret-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+          </div>
+
+          <!-- Dropdown Menu Panel (Absolute Overlay) -->
+          <div id="orders-dropdown-menu" class="hidden absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 shadow-xl rounded p-4 flex flex-col md:flex-row gap-6 text-xs divide-y md:divide-y-0 md:divide-x divide-gray-100 min-w-[280px] md:min-w-[500px]">
+            <!-- Column 1: Order Status Filters -->
+            <div class="flex-1 flex flex-col gap-2 pb-3 md:pb-0">
+              <div class="flex items-center gap-1.5 font-bold text-gray-800 border-b border-gray-100 pb-1.5 mb-1">
+                <svg class="w-3.5 h-3.5 text-[#f97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Order Status
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-status-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="complete" onchange="applyOrderFilters()">
+                  <span>Complete</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-status-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="cancelled" onchange="applyOrderFilters()">
+                  <span>Cancelled</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-status-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="driving" onchange="applyOrderFilters()">
+                  <span>Driving</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-status-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="waiting" onchange="applyOrderFilters()">
+                  <span>Waiting</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-status-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="transporting" onchange="applyOrderFilters()">
+                  <span>Transporting</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Column 2: Reconciliation Status Filters -->
+            <div class="flex-1 flex flex-col gap-2 pt-3 md:pt-0 md:pl-4 pb-3 md:pb-0">
+              <div class="flex items-center gap-1.5 font-bold text-gray-800 border-b border-gray-100 pb-1.5 mb-1">
+                <svg class="w-3.5 h-3.5 text-[#f97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Reconciliation
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-recon-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="Pending" onchange="applyOrderFilters()">
+                  <span>Pending</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-recon-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="Verified" onchange="applyOrderFilters()">
+                  <span>Verified</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-recon-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="Partial Deposit" onchange="applyOrderFilters()">
+                  <span>Partial Deposit</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-recon-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="Missing Deposit" onchange="applyOrderFilters()">
+                  <span>Missing Deposit</span>
+                </label>
+                <label class="flex items-center gap-2 text-gray-600 hover:text-gray-900 cursor-pointer font-semibold">
+                  <input type="checkbox" class="order-recon-checkbox rounded text-[#f97316] focus:ring-[#f97316] border-gray-300" value="Excess Deposit" onchange="applyOrderFilters()">
+                  <span>Excess Deposit</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Column 3: Date Range Picker & Reset -->
+            <div class="flex-1 flex flex-col gap-2 pt-3 md:pt-0 md:pl-4">
+              <div class="flex items-center gap-1.5 font-bold text-gray-800 border-b border-gray-100 pb-1.5 mb-1">
+                <svg class="w-3.5 h-3.5 text-[#f97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Date Filter
+              </div>
+              <div class="flex flex-col gap-2.5">
+                <div class="relative">
+                  <input type="text" id="filter-date-range" class="bg-white border border-gray-300 text-gray-850 rounded px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#f97316] font-semibold w-full cursor-pointer" placeholder="Select date range...">
+                  <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-gray-400">
+                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 mt-2">
+                  <button type="button" onclick="resetOrderFilters()" class="flex-grow px-2 py-1.5 border border-gray-300 text-gray-600 text-[11px] font-bold rounded hover:bg-gray-50 active:scale-95 transition-all text-center">
+                    Clear All Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-white border border-gray-300 rounded shadow-sm overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Recent Orders (Database)</h3>
+          <span class="text-xs text-gray-500">Showing <strong id="order-match-count" class="text-gray-800">{{ db_trips|length }}</strong> of {{ db_trips|length }}</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm text-gray-700" id="orders-table">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-250">
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">#</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Date & Time</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Order ID</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Price (ETB)</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Deposited (ETB)</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Variance</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Reconciliation Status</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Receipts / Deposits</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Pickup Address</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+            {% for t in db_trips %}
+              {% set trip_links = links | selectattr("trip_id", "equalto", t.id) | list %}
+              <tr class="order-row hover:bg-gray-50 transition-colors" 
+                  data-status="{{ t.status }}" 
+                  data-date="{{ t.booked_at.strftime('%Y-%m-%d') if t.booked_at else '' }}" 
+                  data-recon="{{ t.reconciliation_status or 'Pending' }}"
+                  data-id="{{ t.id }}"
+                  data-address="{{ (t.address_from or '')|lower }}"
+                  data-links='[{% for l in trip_links %}{"transaction_id":"{{ l.transaction_id }}","amount_applied":{{ l.amount_applied }}}{% if not loop.last %},{% endif %}{% endfor %}]'>
+                <td class="px-4 py-2 text-xs font-bold text-gray-400">{{ loop.index }}</td>
+                <td class="px-4 py-2 text-xs text-gray-600 font-mono whitespace-nowrap">{{ t.booked_at.strftime('%b %d, %H:%M') if t.booked_at else '—' }}</td>
+                <td class="px-4 py-2 text-xs text-gray-650 font-mono whitespace-nowrap" title="{{ t.id }}">
+                  <div class="flex items-center gap-1.5 group/copy">
+                    <span>{{ t.id[:10] }}…</span>
+                    <button onclick="navigator.clipboard.writeText('{{ t.id }}'); const btn=this; const originalHtml=btn.innerHTML; btn.innerHTML='<svg class=\'w-3.5 h-3.5 text-emerald-600\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\'></path></svg>'; setTimeout(()=>btn.innerHTML=originalHtml, 1500);" class="text-gray-400 hover:text-[#f97316] transition-colors opacity-0 group-hover/copy:opacity-100" title="Copy Order ID">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    </button>
+                  </div>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                  {% if t.status == 'complete' %}
+                    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-250 rounded text-[10px] font-bold uppercase tracking-wider">Complete</span>
+                  {% elif t.status == 'cancelled' %}
+                    <span class="px-2 py-0.5 bg-red-50 text-red-770 border border-red-200 rounded text-[10px] font-bold uppercase tracking-wider">Cancelled</span>
+                  {% else %}
+                    <span class="px-2 py-0.5 bg-gray-50 text-gray-600 border border-gray-200 rounded text-[10px] font-bold uppercase tracking-wider">{{ t.status|title if t.status else 'Unknown' }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2 text-xs font-bold text-gray-800 text-right font-mono">{{ "{:,.2f}".format(t.price|float) if t.price else '—' }}</td>
+                <td class="px-4 py-2 text-xs font-bold text-emerald-700 text-right font-mono">{{ "{:,.2f}".format(t.deposited_amount|float) if t.deposited_amount else '0.00' }}</td>
+                <td class="px-4 py-2 text-xs font-bold text-right font-mono whitespace-nowrap">
+                  {% if t.payment_method == 'cash' and t.price %}
+                    {% set variance = t.deposited_amount - t.price %}
+                    <span class="{% if variance < -0.01 %}text-red-655{% elif variance > 0.01 %}text-blue-600{% else %}text-gray-400{% endif %}">
+                      {% if variance > 0 %}+{% endif %}{{ "{:,.2f}".format(variance) }}
+                    </span>
+                  {% else %}
+                    <span class="text-gray-450">—</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap text-xs">
+                  {% if t.reconciliation_status == 'Verified' %}
+                    <span class="cursor-pointer px-2 py-0.5 bg-emerald-50 text-emerald-750 border border-emerald-250 rounded text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-colors" onclick="openResolveModal('{{ t.id }}', '{{ t.reconciliation_status }}', '{{ t.reconciliation_notes or '' }}', {{ t.price|float if t.price else 0.0 }}, {{ t.deposited_amount|float if t.deposited_amount else 0.0 }})" title="Click to Resolve">{{ t.reconciliation_status }}</span>
+                  {% elif t.reconciliation_status == 'Missing Deposit' %}
+                    <span class="cursor-pointer px-2 py-0.5 bg-red-50 text-red-755 border border-red-250 rounded text-[10px] font-bold uppercase tracking-wider hover:bg-red-100 transition-colors" onclick="openResolveModal('{{ t.id }}', '{{ t.reconciliation_status }}', '{{ t.reconciliation_notes or '' }}', {{ t.price|float if t.price else 0.0 }}, {{ t.deposited_amount|float if t.deposited_amount else 0.0 }})" title="Click to Resolve">{{ t.reconciliation_status }}</span>
+                  {% elif t.reconciliation_status == 'Pending' %}
+                    <span class="cursor-pointer px-2 py-0.5 bg-gray-100 text-gray-650 border border-gray-250 rounded text-[10px] font-bold uppercase tracking-wider hover:bg-gray-200 transition-colors" onclick="openResolveModal('{{ t.id }}', '{{ t.reconciliation_status }}', '{{ t.reconciliation_notes or '' }}', {{ t.price|float if t.price else 0.0 }}, {{ t.deposited_amount|float if t.deposited_amount else 0.0 }})" title="Click to Resolve">{{ t.reconciliation_status }}</span>
+                  {% else %}
+                    <span class="cursor-pointer px-2 py-0.5 bg-orange-50 text-orange-755 border border-orange-255 rounded text-[10px] font-bold uppercase tracking-wider hover:bg-orange-100 transition-colors" onclick="openResolveModal('{{ t.id }}', '{{ t.reconciliation_status }}', '{{ t.reconciliation_notes or '' }}', {{ t.price|float if t.price else 0.0 }}, {{ t.deposited_amount|float if t.deposited_amount else 0.0 }})" title="Click to Resolve">{{ t.reconciliation_status }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap text-xs">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    {% if trip_links %}
+                      {% for link in trip_links %}
+                        <span class="px-1.5 py-0.5 bg-blue-50 border border-blue-100 text-blue-755 text-[9px] rounded font-mono font-bold" title="{{ link.amount_applied }} ETB applied from {{ link.transaction_id }}">{{ link.transaction_id[-6:] }} ({{ "{:,.0f}".format(link.amount_applied) }})</span>
+                      {% endfor %}
+                    {% endif %}
+                    <button onclick="openManageReceiptsModal('{{ t.id }}', '{{ t.price|float if t.price else 0.0 }}', '{{ t.deposited_amount|float }}')" class="px-1.5 py-0.5 border border-gray-200 hover:border-[#f97316] text-[9px] font-bold uppercase rounded bg-gray-50/50 hover:bg-orange-50 text-gray-400 hover:text-[#f97316] transition-all flex items-center gap-0.5" title="Manage Links">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                      <span>Link</span>
+                    </button>
+                  </div>
+                </td>
+                <td class="px-4 py-2 text-xs text-gray-500 max-w-[200px] truncate" title="{{ t.address_from }}">{{ t.address_from or '—' }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="9" class="px-4 py-12 text-center">
+                  <div class="flex flex-col items-center justify-center">
+                    <svg class="w-12 h-12 text-gray-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                    <p class="text-sm text-gray-500 font-semibold">No trips recorded in the database yet.</p>
+                    <p class="text-xs text-gray-400 mt-1">Click "Sync Latest Orders" to fetch history from Yango.</p>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="px-4 py-3 border-t border-gray-250 bg-gray-50 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-500" id="pagination-info">Showing 0 to 0 of 0 entries</span>
+          <div class="flex gap-2">
+            <button onclick="changeOrderPage(-1)" id="btn-prev-page" class="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>Prev</button>
+            <button onclick="changeOrderPage(1)" id="btn-next-page" class="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reconciliation Tab -->
+    <div class="tab-pane hidden" id="tab-reconciliation">
+      <div class="bg-white border border-gray-300 rounded shadow-sm overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Reconciliation History</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm text-gray-700" id="recon-table">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-250">
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Shift Date</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Expected (ETB)</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Deposited (ETB)</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Net Balance (ETB)</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center">Trips / Deposits</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right w-24">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+            {% for r in reconciliations %}
+              <tr class="recon-row hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-2 text-xs text-gray-600 font-mono whitespace-nowrap">{{ r.date }}</td>
+                <td class="px-4 py-2 text-xs font-bold text-gray-800 text-right font-mono">{{ "{:,.2f}".format(r.expected_amount) }}</td>
+                <td class="px-4 py-2 text-xs font-bold text-emerald-700 text-right font-mono">{{ "{:,.2f}".format(r.actual_amount) }}</td>
+                <td class="px-4 py-2 text-xs font-bold text-right font-mono {% if r.balance < -0.01 %}text-red-600{% elif r.balance > 0.01 %}text-emerald-600{% else %}text-gray-500{% endif %}">
+                  {{ "{:+.2f}".format(r.balance) }}
+                </td>
+                <td class="px-4 py-2 text-xs text-gray-500 text-center font-mono">
+                  {{ r.trips_count }} trips / {{ r.txs_count }} txs
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                  {% if r.status == 'Verified' %}
+                    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-250 rounded text-[10px] font-bold uppercase tracking-wider">{{ r.status }}</span>
+                  {% elif r.status == 'Missing Deposit' %}
+                    <span class="px-2 py-0.5 bg-red-50 text-red-700 border border-red-250 rounded text-[10px] font-bold uppercase tracking-wider">{{ r.status }}</span>
+                  {% else %}
+                    <span class="px-2 py-0.5 bg-orange-50 text-orange-700 border border-orange-250 rounded text-[10px] font-bold uppercase tracking-wider">{{ r.status }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap text-right text-xs">
+                  {% if r.expected_amount > 0 and r.status != 'Verified' %}
+                    <button onclick="openMarkShiftPaidModal('{{ r.date }}', '{{ driver.shift }}', {{ r.expected_amount }}, {{ r.actual_amount }})" class="px-2 py-0.5 border border-[#f97316]/50 hover:border-[#f97316] text-[10px] font-bold uppercase rounded bg-orange-50/50 hover:bg-orange-100 text-[#f97316] transition-all active:scale-95">Mark Paid</button>
+                  {% else %}
+                    <span class="text-[10px] font-bold uppercase text-gray-400">N/A</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="7" class="px-4 py-12 text-center">
+                  <div class="flex flex-col items-center justify-center">
+                    <svg class="w-12 h-12 text-gray-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <p class="text-sm text-gray-500 font-semibold">No reconciliation records found for this driver.</p>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <!-- Reconciliation Pagination -->
+        <div class="px-4 py-3 border-t border-gray-250 bg-gray-50 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-500" id="recon-pagination-info">Showing 0 to 0 of 0 entries</span>
+          <div class="flex gap-2">
+            <button onclick="changeReconPage(-1)" id="btn-recon-prev" class="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>Prev</button>
+            <button onclick="changeReconPage(1)" id="btn-recon-next" class="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deposits Tab -->
+    <div class="tab-pane hidden" id="tab-deposits">
+      <div class="bg-white border border-gray-300 rounded shadow-sm overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Telebirr Deposit History</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm text-gray-700" id="deposits-table">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-250">
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Timestamp</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Sender ID (Operator)</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Opposite Party</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Linked Trips</th>
+                <th class="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Amount (ETB)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+            {% for tx in transactions %}
+              <tr class="deposit-row hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-2 text-xs text-blue-600 font-mono whitespace-nowrap">
+                  <div class="flex items-center gap-1.5 group/tx">
+                    <a href="https://transactioninfo.ethiotelecom.et/receipt/{{ tx.transaction_id }}" target="_blank" class="hover:underline">
+                        {{ tx.transaction_id }}
+                    </a>
+                    <button onclick="copyToClipboard('{{ tx.transaction_id }}', this)" class="text-gray-400 hover:text-[#f97316] transition-colors opacity-0 group-hover/tx:opacity-100" title="Copy Transaction ID">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 012-2v-8a2 2 0 01-2-2h-8a2 2 0 01-2 2v8a2 2 0 012 2z"></path></svg>
+                    </button>
+                  </div>
+                </td>
+                <td class="px-4 py-2 text-xs text-gray-600 font-mono whitespace-nowrap">{{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td class="px-4 py-2 text-xs font-bold text-blue-600 font-mono whitespace-nowrap">{{ tx.sender_identifier }}</td>
+                <td class="px-4 py-2 text-xs text-gray-550 whitespace-nowrap">{{ tx.opposite_party or 'N/A' }}</td>
+                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
+                  {% set tx_links = links | selectattr("transaction_id", "equalto", tx.transaction_id) | list %}
+                  {% if tx_links %}
+                    <div class="flex flex-wrap gap-1">
+                    {% for link in tx_links %}
+                      <span class="px-1.5 py-0.5 bg-gray-100 border border-gray-200 text-gray-650 text-[9px] rounded font-mono" title="{{ link.amount_applied }} ETB applied to trip {{ link.trip_id }}">{{ link.trip_id[:8] }} ({{ "{:,.0f}".format(link.amount_applied) }})</span>
+                    {% endfor %}
+                    </div>
+                  {% else %}
+                    <span class="text-gray-400 text-[10px] italic">Unreconciled</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2 text-xs font-bold text-gray-800 text-right font-mono">{{ "{:,.2f}".format(tx.amount) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="6" class="px-4 py-12 text-center">
+                  <div class="flex flex-col items-center justify-center">
+                    <svg class="w-12 h-12 text-gray-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <p class="text-sm text-gray-500 font-semibold">No Telebirr deposits recorded for this driver.</p>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <!-- Deposits Pagination -->
+        <div class="px-4 py-3 border-t border-gray-250 bg-gray-50 flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-500" id="deposits-pagination-info">Showing 0 to 0 of 0 entries</span>
+          <div class="flex gap-2">
+            <button onclick="changeDepositPage(-1)" id="btn-deposits-prev" class="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>Prev</button>
+            <button onclick="changeDepositPage(1)" id="btn-deposits-next" class="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Driver Details Tab -->
+    <div class="tab-pane hidden" id="tab-details">
+      <div class="bg-white border border-gray-300 rounded shadow-sm overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Full Driver Profile (Local + Yango Live)</h3>
+          <div id="yango-live-pill">
+            <span class="px-2.5 py-1 bg-gray-100 text-gray-600 border border-gray-255 rounded text-[10px] font-bold uppercase tracking-wider animate-pulse">Connecting...</span>
+          </div>
+        </div>
+        <!-- Local & Basic Metadata Summary -->
+        <div class="bg-gray-50 border-b border-gray-200 p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm select-none">
+          <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Total Synced Orders</div>
+              <div class="text-xl font-bold text-gray-900 font-mono">{{ db_trips|length }}</div>
+            </div>
+            <div class="text-gray-300">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+            </div>
+          </div>
+
+          <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Local Hire Date</div>
+              <div class="text-sm font-bold text-gray-800">
+                {% if yango_profile and yango_profile.profile %}
+                  {{ yango_profile.profile.hire_date or '—' }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+            </div>
+            <div class="text-gray-300">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            </div>
+          </div>
+
+          <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Registration Date</div>
+              <div class="text-sm font-bold text-gray-800">{{ driver.created_at.strftime('%Y-%m-%d') }}</div>
+            </div>
+            <div class="text-gray-300">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-12 0 9 9 0 0112 0z"></path></svg>
+            </div>
+          </div>
+        </div>
+        <div id="yango-live-content" class="p-6">
+          <div class="flex justify-center p-8">
+            <svg class="animate-spin w-8 h-8 text-[#f97316]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs Tab -->
+    <div class="tab-pane hidden" id="tab-kpis">
+      <div class="bg-white border border-gray-300 rounded-2xl shadow-sm overflow-hidden mb-6">
+        <div class="px-5 py-4 border-b border-gray-150 bg-gray-50/50 flex justify-between items-center">
+          <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-[#f97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20.488 9H15V1.512A9.025 9.025 0 0120.488 9z"></path>
+            </svg>
+            Driver KPIs & Analytics
+          </h3>
+          <span class="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-amber-200">Assembling Engine</span>
+        </div>
+        
+        <div class="p-12 flex flex-col items-center justify-center text-center bg-gradient-to-b from-white to-slate-50/30 min-h-[450px]">
+          <!-- Modern Puzzle Loading Animation Wrapper -->
+          <div class="puzzle-container relative w-48 h-48 mb-8 flex items-center justify-center">
+            <!-- Glow Effect -->
+            <div class="absolute inset-0 bg-[#f97316]/5 rounded-full blur-3xl scale-125 animate-pulse-slow"></div>
+            
+            <!-- Puzzle SVG -->
+            <svg class="w-32 h-32 relative z-10 drop-shadow-[0_10px_20px_rgba(0,0,0,0.06)]" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="puzzle-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fdba74" />
+                  <stop offset="100%" stop-color="#f97316" />
+                </linearGradient>
+                <linearGradient id="puzzle-teal" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#2dd4bf" />
+                  <stop offset="100%" stop-color="#0d9488" />
+                </linearGradient>
+                <linearGradient id="puzzle-violet" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#c084fc" />
+                  <stop offset="100%" stop-color="#7c3aed" />
+                </linearGradient>
+                <linearGradient id="puzzle-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#60a5fa" />
+                  <stop offset="100%" stop-color="#2563eb" />
+                </linearGradient>
+              </defs>
+              
+              <!-- Piece 1: Top Left (Orange) -->
+              <path class="puzzle-piece top-left" fill="url(#puzzle-orange)" d="
+                M 35,35 
+                H 70 
+                A 15,15 0 0,1 100,35 
+                H 105 
+                V 70 
+                A 15,15 0 0,1 105,100 
+                V 105 
+                H 35 
+                Z" />
+                
+              <!-- Piece 2: Top Right (Teal) -->
+              <path class="puzzle-piece top-right" fill="url(#puzzle-teal)" d="
+                M 105,35 
+                H 130 
+                A 15,15 0 0,1 165,35 
+                H 165 
+                V 105 
+                H 130 
+                A 15,15 0 0,0 100,105 
+                V 35 
+                Z" />
+                
+              <!-- Piece 3: Bottom Left (Violet) -->
+              <path class="puzzle-piece bottom-left" fill="url(#puzzle-violet)" d="
+                M 35,105 
+                H 70 
+                A 15,15 0 0,0 100,105 
+                V 130 
+                A 15,15 0 0,1 100,165 
+                V 165 
+                H 35 
+                Z" />
+                
+              <!-- Piece 4: Bottom Right (Blue) -->
+              <path class="puzzle-piece bottom-right" fill="url(#puzzle-blue)" d="
+                M 105,105 
+                H 165 
+                V 165 
+                H 105 
+                Z" />
+            </svg>
+          </div>
+          
+          <!-- Sleek Text Info -->
+          <div class="max-w-md space-y-3 z-10">
+            <h4 class="text-lg font-black text-slate-850 tracking-tight flex items-center justify-center gap-2">
+              Assembling Analytics Dashboard
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>
+                Processing
+              </span>
+            </h4>
+            <p class="text-xs font-semibold text-slate-500 leading-relaxed max-w-sm mx-auto">
+              We are compiling this driver's high-fidelity performance graphs, efficiency metrics, and trip scores. 
+              Please <span class="text-[#f97316] font-bold">come back later</span> to view the fully assembled insights.
+            </p>
+            
+            <div class="pt-4 flex justify-center gap-3">
+              <button onclick="switchTab('orders')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Return to Orders
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documents Tab [NEW] -->
+    <div class="tab-pane hidden animate-fade-in" id="tab-documents">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+        <!-- Left: Upload Section -->
+        <div class="lg:col-span-4 space-y-6">
+          <div class="bg-white border border-gray-300 rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-150 bg-gray-50/50">
+              <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-[#f97316]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Upload Document
+              </h3>
+            </div>
+            
+            <form id="doc-upload-form" onsubmit="submitDriverDocument(event)" class="p-5 space-y-4">
+              <!-- Doc Type -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Document Type</label>
+                <select id="doc-type" required class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs font-bold text-slate-800 bg-white">
+                  <option value="Driver License">Driver's License</option>
+                  <option value="Librea">Librea (Yellow Card)</option>
+                  <option value="ID Card">National ID Card</option>
+                  <option value="Contract">Contract / Agreement</option>
+                  <option value="Other">Other Document</option>
+                </select>
+              </div>
+
+              <!-- Notes -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Notes / Expiry / Description</label>
+                <textarea id="doc-notes" rows="3" class="w-full px-3.5 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs font-semibold text-gray-805 resize-none transition-all placeholder-gray-400" placeholder="e.g. License ID: DL-1234, Expiry: 2028-12-31"></textarea>
+              </div>
+
+              <!-- Custom File Select Area -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Select File (Image / PDF)</label>
+                <div class="relative border-2 border-dashed border-gray-200 hover:border-[#f97316] bg-slate-50/50 hover:bg-orange-50/10 rounded-2xl p-6 transition-all duration-150 flex flex-col items-center justify-center text-center group cursor-pointer">
+                  <input type="file" id="doc-file-input" required accept="image/*,application/pdf" onchange="onDocFileSelect(this)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                  <div class="pointer-events-none space-y-1.5 flex flex-col items-center">
+                    <svg class="w-8 h-8 text-gray-400 group-hover:text-[#f97316] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <span id="doc-file-label" class="text-xs font-bold text-gray-700 block transition-colors group-hover:text-[#f97316]">Choose File...</span>
+                    <span id="doc-file-meta" class="text-[10px] text-gray-400 font-bold font-mono">Max size: 10MB</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Submit -->
+              <button type="submit" id="btn-submit-doc" class="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all active:scale-95 duration-150 text-center flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Upload & Save Document
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Right: Saved Documents Grid -->
+        <div class="lg:col-span-8">
+          <div class="bg-white border border-gray-300 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+            <div class="px-5 py-4 border-b border-gray-150 bg-gray-50/50 flex justify-between items-center">
+              <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Active Documents Portfolio
+              </h3>
+              <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono font-black uppercase">{{ driver.documents|length }} total</span>
+            </div>
+
+            <div class="p-5 flex-1 bg-slate-50/30">
+              {% if driver.documents %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {% for doc in driver.documents %}
+                    <div class="bg-white border border-gray-200 hover:border-gray-300 p-4.5 rounded-2xl shadow-sm transition-all flex flex-col justify-between group">
+                      <div class="space-y-3">
+                        <div class="flex justify-between items-start gap-2">
+                          <div class="flex flex-col gap-1 min-w-0">
+                            <!-- Label Pill based on doc type -->
+                            {% if doc.document_type == 'Driver License' %}
+                              <span class="inline-flex self-start px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-[9px] font-black text-blue-700 uppercase font-mono tracking-wider">License</span>
+                            {% elif doc.document_type == 'Librea' %}
+                              <span class="inline-flex self-start px-2 py-0.5 bg-amber-50 border border-amber-250 rounded text-[9px] font-black text-amber-700 uppercase font-mono tracking-wider">Librea</span>
+                            {% elif doc.document_type == 'ID Card' %}
+                              <span class="inline-flex self-start px-2 py-0.5 bg-purple-50 border border-purple-200 rounded text-[9px] font-black text-purple-700 uppercase font-mono tracking-wider">National ID</span>
+                            {% elif doc.document_type == 'Contract' %}
+                              <span class="inline-flex self-start px-2 py-0.5 bg-emerald-50 border border-emerald-250 rounded text-[9px] font-black text-emerald-700 uppercase font-mono tracking-wider">Contract</span>
+                            {% else %}
+                              <span class="inline-flex self-start px-2 py-0.5 bg-gray-50 border border-gray-250 rounded text-[9px] font-black text-gray-600 uppercase font-mono tracking-wider">Other</span>
+                            {% endif %}
+                            
+                            <h4 class="font-extrabold text-xs text-slate-800 truncate" title="{{ doc.filename }}">{{ doc.filename }}</h4>
+                          </div>
+                          
+                          <!-- Visual Mini Preview Thumb / Icon -->
+                          <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {% if doc.content_type.startswith('image/') %}
+                              <img src="{{ doc.file_data }}" class="w-full h-full object-cover">
+                            {% else %}
+                              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                            {% endif %}
+                          </div>
+                        </div>
+
+                        <!-- Notes/Details -->
+                        <div class="text-[11px] text-gray-500 leading-relaxed min-h-[34px]">
+                          {% if doc.notes %}
+                            <p class="font-semibold text-slate-700 italic border-l-2 border-slate-200 pl-2 py-0.5">{{ doc.notes }}</p>
+                          {% else %}
+                            <p class="text-gray-400 italic font-medium">No descriptive notes logged.</p>
+                          {% endif %}
+                        </div>
+                      </div>
+
+                      <!-- Bottom stats & micro-actions -->
+                      <div class="pt-4 border-t border-gray-100 mt-4 flex justify-between items-center gap-2">
+                        <span class="text-[9px] font-extrabold text-gray-400 font-mono">Uploaded: {{ doc.uploaded_at.strftime('%Y-%m-%d') }}</span>
+                        
+                        <div class="flex items-center gap-1.5">
+                          <!-- Delete -->
+                          <button onclick="deleteDriverDocument({{ doc.id }})" class="p-1.5 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg text-red-600 hover:text-red-700 transition-colors" title="Delete Document">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          </button>
+                          <!-- Direct Download -->
+                          <a href="{{ doc.file_data }}" download="{{ doc.filename }}" class="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 rounded-lg text-slate-600 hover:text-slate-700 transition-colors" title="Download Original">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                          </a>
+                          <!-- Immersive Preview -->
+                          <button onclick="openDocumentPreview('{{ doc.filename|escape }}', '{{ doc.content_type }}', '{{ doc.file_data }}')" class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-755 font-bold uppercase rounded-lg text-[10px] transition-colors flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            Preview
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="flex flex-col items-center justify-center text-center py-16 px-4 space-y-3.5 h-full">
+                  <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shadow-inner border border-slate-200/50">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                  </div>
+                  <div class="space-y-1 max-w-sm">
+                    <h4 class="font-extrabold text-sm text-slate-700">No Documents Logged Yet</h4>
+                    <p class="text-xs text-gray-500 leading-relaxed font-semibold">Upload the driver's License, Librea, National ID, or operational contracts on the left to securely record them in their system portfolio.</p>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic Immersive Document Preview Overlay Modal -->
+  <div id="documentPreviewModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[2000] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-150 transform transition-all flex flex-col max-h-[90vh]">
+      <!-- Header -->
+      <div class="px-6 py-4.5 border-b border-gray-100 flex justify-between items-center bg-gray-50/60">
+        <h3 id="preview-doc-title" class="font-black text-base text-slate-800 truncate pr-6 tracking-tight">Document Preview</h3>
+        <button onclick="closeDocumentPreview()" class="text-gray-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-all flex-shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <!-- Preview Viewport -->
+      <div class="p-6 overflow-auto bg-slate-50 flex-1 flex items-center justify-center min-h-[400px]">
+        <div id="preview-viewport-content" class="w-full h-full flex justify-center items-center">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Odoo Chatter Section -->
+  <div class="bg-white border border-gray-300 rounded shadow-sm overflow-hidden mb-8 animate-fade-in">
+    <!-- Chatter Header -->
+    <div class="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center justify-between select-none">
+      <div class="flex items-center gap-4">
+        <button class="flex items-center gap-1.5 text-xs font-bold text-[#f97316] border-b-2 border-[#f97316] pb-3 pt-1 uppercase tracking-wider">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+          Chatter & Notes
+        </button>
+      </div>
+      <span class="text-xs text-gray-400 font-semibold" id="chatter-count">0 entries</span>
+    </div>
+    
+    <div class="p-6">
+      <!-- Note Input Form -->
+      <form id="chatter-form" onsubmit="submitChatterNote(event)" class="mb-6">
+        <div class="flex gap-4">
+          <div class="w-9 h-9 rounded-full bg-[#f97316]/10 text-[#f97316] flex items-center justify-center text-sm font-black uppercase select-none flex-shrink-0 shadow-sm border border-[#f97316]/10">
+            {{ user.email[0]|upper if user and user.email else 'U' }}
+          </div>
+          <div class="flex-1 col-span-1">
+            <textarea id="chatter-textarea" rows="2" class="w-full px-3.5 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#f97316] text-sm text-gray-850 placeholder-gray-400 resize-none transition-all focus:border-[#f97316] shadow-inner" placeholder="Log an internal note or update for this driver..."></textarea>
+            <div class="flex flex-wrap justify-between items-center gap-2 mt-2.5">
+              <span class="text-[10px] text-gray-400 font-medium">Notes logged here are saved to the administrative audit logs and visible to all managers.</span>
+              <button type="submit" id="btn-submit-note" class="flex items-center gap-1.5 px-4 py-1.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded shadow-sm transition-all active:scale-95 disabled:opacity-50">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                Log Note
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+      
+      <!-- Timeline Thread -->
+      <div class="relative border-l-2 border-gray-150 pl-6 ml-4.5 space-y-6" id="chatter-timeline">
+        <div class="flex justify-center p-8">
+          <svg class="animate-spin w-6 h-6 text-[#f97316]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- Track Modal -->
+<div class="fixed inset-0 bg-black/40 z-[1000] hidden items-center justify-center" id="trackModal">
+  <div class="bg-white rounded border border-gray-300 w-[92%] max-w-[680px] max-h-[85vh] flex flex-col shadow-lg">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+      <h3 id="trackModalTitle" class="text-sm font-bold text-gray-800">Order Track</h3>
+      <button class="text-xl text-gray-400 hover:text-gray-650 leading-none" onclick="closeTrack()">&times;</button>
+    </div>
+    <div class="overflow-y-auto px-4 py-3 flex-1 text-sm text-gray-700" id="trackModalBody">
+      <p class="text-center text-gray-550 italic py-6">Loading telemetry data…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Resolve Exception Modal -->
+<div class="fixed inset-0 bg-black/40 z-[1000] hidden items-center justify-center" id="resolveModal">
+  <div class="bg-white rounded border border-gray-300 w-[92%] max-w-[450px] max-h-[85vh] flex flex-col shadow-lg">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+      <h3 class="text-sm font-bold text-gray-800">Resolve Trip Exception</h3>
+      <button class="text-xl text-gray-400 hover:text-gray-650 leading-none" onclick="closeResolveModal()">&times;</button>
+    </div>
+    <div class="overflow-y-auto px-4 py-4 flex-1">
+      <form id="resolveForm" onsubmit="submitResolution(event)">
+        <input type="hidden" id="resolve-trip-id">
+        <div class="mb-4">
+          <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">New Status</label>
+          <select id="resolve-status" class="w-full px-2.5 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs font-semibold text-gray-900 bg-white">
+            <option value="Verified">Verified (Manual)</option>
+            <option value="Partial Deposit">Partial Deposit</option>
+            <option value="Missing Deposit">Missing Deposit</option>
+            <option value="Excess Deposit">Excess Deposit</option>
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Deposited Amount (ETB)</label>
+          <div class="flex gap-2">
+            <input type="number" id="resolve-amount" step="0.01" min="0" required class="w-full px-2.5 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs font-bold font-mono text-gray-900" placeholder="0.00">
+            <button type="button" onclick="setResolveFullPrice()" class="px-3 py-1 bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-[#f97316] text-[#f97316] text-[10px] font-bold uppercase rounded transition-colors whitespace-nowrap">Set Full Price</button>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Notes / Rationale</label>
+          <textarea id="resolve-notes" class="w-full px-2.5 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs min-h-[80px] text-gray-850" placeholder="e.g., Driver paid in cash directly to office..."></textarea>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 bg-[#f97316] hover:bg-[#ea580c] text-white px-3 py-1.5 rounded font-bold text-xs transition-colors">Save Resolution</button>
+          <button type="button" onclick="closeResolveModal()" class="flex-1 bg-white border border-gray-300 text-gray-750 px-3 py-1.5 rounded font-bold text-xs hover:bg-gray-50 transition-colors">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Mark Shift Paid Modal -->
+<div class="fixed inset-0 bg-black/40 z-[1000] hidden items-center justify-center" id="markShiftPaidModal">
+  <div class="bg-white rounded border border-gray-300 w-[92%] max-w-[450px] max-h-[85vh] flex flex-col shadow-lg">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+      <h3 class="text-sm font-bold text-gray-800">Reconcile Entire Shift</h3>
+      <button class="text-xl text-gray-400 hover:text-gray-650 leading-none" onclick="closeMarkShiftPaidModal()">&times;</button>
+    </div>
+    <div class="overflow-y-auto px-4 py-4 flex-1">
+      <form id="markShiftPaidForm" onsubmit="submitShiftPaid(event)">
+        <input type="hidden" id="shift-paid-date">
+        <input type="hidden" id="shift-paid-type">
+        
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 space-y-1.5 text-xs text-slate-700">
+          <div class="flex justify-between">
+            <span class="font-semibold">Shift Date:</span>
+            <span id="shift-display-date" class="font-mono font-bold">--</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-semibold">Shift Name:</span>
+            <span id="shift-display-name" class="font-mono font-bold">--</span>
+          </div>
+          <div class="flex justify-between border-t border-slate-200 pt-1.5 mt-1.5">
+            <span class="font-semibold">Expected (ETB):</span>
+            <span id="shift-display-expected" class="font-mono font-bold text-slate-800">0.00 ETB</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="font-semibold">Deposited (ETB):</span>
+            <span id="shift-display-actual" class="font-mono font-bold text-emerald-600">0.00 ETB</span>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Manager Notes / Receipt Details</label>
+          <textarea id="shift-paid-notes" required class="w-full px-2.5 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs min-h-[80px] text-gray-850" placeholder="e.g., Driver paid outstanding shift balance of cash directly to Admin..."></textarea>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-bold text-xs transition-colors shadow-md">Confirm Shift Settlement</button>
+          <button type="button" onclick="closeMarkShiftPaidModal()" class="flex-1 bg-white border border-gray-300 text-gray-750 px-3 py-1.5 rounded font-bold text-xs hover:bg-gray-50 transition-colors">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Receipts Modal -->
+<div id="manageReceiptsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100/50 transform transition-all flex flex-col">
+    <!-- Modal Header -->
+    <div class="px-6 py-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+      <h3 class="font-black text-lg text-slate-800 tracking-tight flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+        Manage Receipts & Deposits
+      </h3>
+      <button onclick="closeManageReceiptsModal()" class="text-gray-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-50 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    
+    <!-- Modal Body -->
+    <div class="p-6 overflow-y-auto max-h-[75vh] space-y-5">
+      <!-- Trip Summary KPI cards -->
+      <div class="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100/80">
+        <div class="text-center">
+          <span class="text-[10px] font-black text-slate-400 uppercase block mb-1">Trip Price</span>
+          <span id="manage-trip-price" class="font-extrabold text-sm text-slate-800">0.00 ETB</span>
+        </div>
+        <div class="text-center border-x border-slate-200/60">
+          <span class="text-[10px] font-black text-slate-400 uppercase block mb-1">Deposited</span>
+          <span id="manage-trip-deposited" class="font-extrabold text-sm text-emerald-600">0.00 ETB</span>
+        </div>
+        <div class="text-center">
+          <span class="text-[10px] font-black text-slate-400 uppercase block mb-1">Remaining</span>
+          <span id="manage-trip-remaining" class="font-extrabold text-sm text-red-500">0.00 ETB</span>
+        </div>
+      </div>
+
+      <!-- Section: Linked Receipts -->
+      <div>
+        <h4 class="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+          Linked Receipts / Deposits
+        </h4>
+        <div id="linked-receipts-list" class="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+          <!-- Populated dynamically via JS -->
+          <p class="text-xs text-gray-400 italic py-2 text-center">No receipts linked yet.</p>
+        </div>
+      </div>
+
+      <hr class="border-gray-100">
+
+      <!-- Section: Link New Receipt -->
+      <div>
+        <h4 class="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Link Available Deposit
+        </h4>
+        
+        <form id="link-deposit-form" onsubmit="submitLinkDeposit(event)" class="space-y-4">
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Select Available Receipt / Deposit</label>
+            <select id="available-deposits-select" onchange="onDepositSelectChange()" class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs font-semibold text-gray-900 bg-white">
+              <!-- Populated dynamically via JS -->
+              <option value="">-- No available deposits found --</option>
+            </select>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Remaining Balance (ETB)</label>
+              <input type="text" id="deposit-remaining-display" readonly class="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-xl text-xs font-bold font-mono" value="0.00">
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Amount to Apply (ETB)</label>
+              <input type="number" id="deposit-amount-input" step="0.01" min="0.01" required class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#f97316] text-xs font-bold font-mono text-gray-900" placeholder="0.00">
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2.5 pt-2">
+            <button type="button" id="btn-mark-trip-paid" onclick="markManageTripPaid()" class="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all active:scale-95 duration-150 text-center flex items-center justify-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              Mark Trip as Paid (Direct Cash)
+            </button>
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="closeManageReceiptsModal()" class="flex-1 px-4 py-2.5 border border-gray-200 hover:bg-gray-50 text-slate-700 text-xs font-bold uppercase rounded-xl transition-all active:scale-95 duration-150 text-center">
+                Close
+              </button>
+              <button type="submit" id="btn-submit-link" class="flex-1 px-4 py-2.5 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-orange-500/10 hover:shadow-orange-500/20 transition-all active:scale-95 duration-150 text-center">
+                Link Selected Receipt
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Driver Sync Wizard Modal -->
+<div id="driver-sync-wizard-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100/50 transform transition-all flex flex-col">
+    <!-- Modal Header -->
+    <div class="px-6 py-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+      <h3 class="font-black text-lg text-slate-800 tracking-tight flex items-center gap-2">
+        <span id="driver-sync-header-pulse" class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+        Driver Sync Wizard
+      </h3>
+      <button onclick="closeDriverSyncWizard()" class="text-gray-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-50 transition-all">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    
+    <!-- Modal Body -->
+    <div class="p-6">
+      <!-- Sync Status Block -->
+      <div class="flex flex-col items-center text-center mb-6">
+        <!-- Spinning Loader Container -->
+        <div id="driver-sync-loader" class="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-4 transition-all">
+          <svg id="driver-sync-icon-static" class="w-8 h-8 text-orange-500 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        </div>
+        
+        <h4 id="driver-sync-status-title" class="font-extrabold text-slate-800 text-base mb-1">Sync Yango Trips</h4>
+        <p id="driver-sync-status-desc" class="text-xs text-slate-500 font-semibold px-4">Start synchronization to fetch this driver's latest trips and revenue logs directly from Yango API.</p>
+      </div>
+
+      <!-- Stats/Metrics -->
+      <div id="driver-sync-stats-container" class="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-5 text-xs font-semibold text-slate-600 space-y-2.5 hidden">
+        <div class="flex justify-between items-center pb-1 border-b border-slate-200/50">
+          <span>Driver:</span>
+          <span class="font-bold text-slate-800 truncate max-w-[200px]">{{ driver.name }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span>New Trips Imported:</span>
+          <span id="driver-sync-stat-inserted" class="font-bold text-emerald-600">0</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span>Trips Updated/Refreshed:</span>
+          <span id="driver-sync-stat-updated" class="font-bold text-blue-600">0</span>
+        </div>
+      </div>
+
+      <!-- Progress Bar Block -->
+      <div id="driver-sync-progress-container" class="mb-6 hidden">
+        <div class="flex justify-between text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+          <span>Progress</span>
+          <span id="driver-sync-progress-pct">0%</span>
+        </div>
+        <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200/30">
+          <div id="driver-sync-progress-bar" class="bg-gradient-to-r from-orange-500 to-orange-600 h-full rounded-full transition-all duration-300 w-0"></div>
+        </div>
+      </div>
+
+      <!-- Last Sync Details -->
+      <div id="driver-sync-last-details" class="flex items-center gap-2 justify-center text-xs font-bold text-slate-400 bg-gray-50/50 py-2.5 rounded-xl border border-dashed border-gray-200/60 mb-6 select-none">
+        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span>Last Sync: <span id="driver-sync-last-time">Never</span></span>
+      </div>
+
+      <!-- Modal Action Buttons -->
+      <div class="flex items-center gap-3">
+        <button type="button" onclick="closeDriverSyncWizard()" class="flex-1 px-4 py-3 border border-gray-200 hover:bg-gray-50 text-slate-700 text-xs font-bold uppercase rounded-xl transition-all active:scale-95 duration-150 text-center">
+          Cancel
+        </button>
+        <button type="button" id="btn-driver-sync-action" onclick="startDriverSyncProcess()" class="flex-1 px-4 py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-orange-500/10 hover:shadow-orange-500/20 transition-all active:scale-95 duration-150 text-center">
+          Start Sync
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Initialize Flatpickr for Date Range
+let datePicker;
+document.addEventListener('DOMContentLoaded', () => {
+  datePicker = flatpickr("#filter-date-range", {
+    mode: "range",
+    dateFormat: "Y-m-d",
+    onClose: function(selectedDates, dateStr, instance) {
+      if (selectedDates.length === 2 || selectedDates.length === 0) {
+        applyOrderFilters();
+      }
+    }
+  });
+});
+
+window.currentResolveTripPrice = 0.0;
+
+function openResolveModal(tripId, currentStatus, notes, price, currentDeposit) {
+    document.getElementById('resolve-trip-id').value = tripId;
+    document.getElementById('resolve-status').value = currentStatus === 'Pending' ? 'Verified' : currentStatus;
+    document.getElementById('resolve-notes').value = notes;
+    
+    // Store price globally
+    window.currentResolveTripPrice = parseFloat(price) || 0.0;
+    
+    // Set deposited amount input
+    const depositInput = document.getElementById('resolve-amount');
+    if (depositInput) {
+        depositInput.value = parseFloat(currentDeposit).toFixed(2);
+    }
+    
+    document.getElementById('resolveModal').classList.remove('hidden');
+    document.getElementById('resolveModal').classList.add('flex');
+}
+
+function setResolveFullPrice() {
+    const depositInput = document.getElementById('resolve-amount');
+    if (depositInput && window.currentResolveTripPrice) {
+        depositInput.value = window.currentResolveTripPrice.toFixed(2);
+    }
+}
+
+function closeResolveModal() {
+    document.getElementById('resolveModal').classList.add('hidden');
+    document.getElementById('resolveModal').classList.remove('flex');
+}
+
+async function submitResolution(e) {
+    e.preventDefault();
+    const tripId = document.getElementById('resolve-trip-id').value;
+    const status = document.getElementById('resolve-status').value;
+    const notes = document.getElementById('resolve-notes').value;
+    const depositedAmount = document.getElementById('resolve-amount').value;
+    
+    const formData = new FormData();
+    formData.append('status', status);
+    formData.append('notes', notes);
+    if (depositedAmount !== '') {
+        formData.append('deposited_amount', parseFloat(depositedAmount));
+    }
+    
+    try {
+        const res = await fetch(`/api/trips/${tripId}/resolve`, {
+            method: 'POST',
+            body: formData
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert('Failed to update trip status');
+        }
+    } catch (err) {
+        alert('Error communicating with server');
+    }
+}
+
+function openMarkShiftPaidModal(dateStr, shiftName, expectedVal, actualVal) {
+    document.getElementById('shift-paid-date').value = dateStr;
+    document.getElementById('shift-paid-type').value = shiftName;
+    
+    document.getElementById('shift-display-date').textContent = dateStr;
+    document.getElementById('shift-display-name').textContent = shiftName + ' Shift';
+    document.getElementById('shift-display-expected').textContent = parseFloat(expectedVal).toFixed(2) + ' ETB';
+    document.getElementById('shift-display-actual').textContent = parseFloat(actualVal).toFixed(2) + ' ETB';
+    
+    // Suggest standard receipt message
+    document.getElementById('shift-paid-notes').value = `Manager Cash Settlement: Driver paid remaining outstanding shift balance of ${(parseFloat(expectedVal) - parseFloat(actualVal)).toFixed(2)} ETB in cash directly to office.`;
+    
+    document.getElementById('markShiftPaidModal').classList.remove('hidden');
+    document.getElementById('markShiftPaidModal').classList.add('flex');
+}
+
+function closeMarkShiftPaidModal() {
+    document.getElementById('markShiftPaidModal').classList.add('hidden');
+    document.getElementById('markShiftPaidModal').classList.remove('flex');
+}
+
+async function submitShiftPaid(e) {
+    e.preventDefault();
+    const dateStr = document.getElementById('shift-paid-date').value;
+    const shiftName = document.getElementById('shift-paid-type').value;
+    const notes = document.getElementById('shift-paid-notes').value;
+    
+    const formData = new FormData();
+    formData.append('target_date', dateStr);
+    formData.append('shift', shiftName);
+    if (notes) {
+        formData.append('notes', notes);
+    }
+    
+    const btn = e.target.querySelector('button[type="submit"]');
+    const oldText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+    
+    try {
+        const res = await fetch(`/api/drivers/{{ driver.id }}/reconciliation/mark-shift-paid`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (res.ok && data.status === 'success') {
+            alert(`Successfully updated ${data.trips_updated} outstanding trip(s) in this shift to Verified.`);
+            window.location.reload();
+        } else {
+            alert('Failed to settle shift: ' + (data.detail || 'Unknown error'));
+            btn.disabled = false;
+            btn.textContent = oldText;
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error communicating with server');
+        btn.disabled = false;
+        btn.textContent = oldText;
+    }
+}
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active', 'text-[#f97316]', 'border-[#f97316]');
+        b.classList.add('text-gray-500', 'border-transparent');
+    });
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+    
+    btn.classList.remove('text-gray-500', 'border-transparent');
+    btn.classList.add('active', 'text-[#f97316]', 'border-[#f97316]');
+    
+    const tabId = btn.dataset.tab;
+    document.getElementById('tab-' + tabId).classList.remove('hidden');
+  });
+});
+
+function switchTab(tabId) {
+  const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+  if (btn) {
+    btn.click();
+    document.getElementById('dd-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// Track Modal
+async function openTrack(orderId) {
+  const modal = document.getElementById('trackModal');
+  const body = document.getElementById('trackModalBody');
+  const title = document.getElementById('trackModalTitle');
+  title.textContent = 'Track — ' + orderId.substring(0,12) + '…';
+  body.innerHTML = '<p class="text-center text-gray-500 py-8">Fetching telemetry…</p>';
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+
+  try {
+    const res = await fetch('/api/orders/' + orderId + '/track');
+    const data = await res.json();
+    const track = data.track || [];
+
+    if (!track.length) {
+      body.innerHTML = '<p class="text-center text-gray-500 py-8 italic">No telemetry data available for this order.</p>';
+      return;
+    }
+
+    const statusClass = s => ({driving:'bg-blue-100 text-blue-700', waiting:'bg-yellow-100 text-yellow-800', transporting:'bg-green-100 text-green-700'}[s] || 'bg-gray-100 text-gray-600');
+
+    body.innerHTML = '<div class="mb-3 text-xs text-gray-500">' + track.length + ' tracking points recorded</div>' +
+      track.map((pt, i) => `
+        <div class="grid grid-cols-[auto_1fr_auto] gap-3 py-2.5 border-b border-gray-100 items-center text-xs last:border-0">
+          <span class="text-gray-400 min-w-[24px] text-right font-bold">${i+1}</span>
+          <div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusClass(pt.order_status)}">${pt.order_status || '—'}</span>
+            <span class="text-gray-500 ml-2">${pt.tracked_at ? pt.tracked_at.replace('T',' ').substring(0,16) : ''}</span>
+            <div class="tabular-nums text-[11px] text-gray-500 mt-1">
+              ${pt.location ? `${pt.location.lat.toFixed(5)}, ${pt.location.lon.toFixed(5)}` : ''}
+              · ${pt.speed ? pt.speed + ' m/s' : ''} · ${pt.distance ? (pt.distance/1000).toFixed(2) + ' km' : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+  } catch(e) {
+    body.innerHTML = '<p class="text-center text-red-500 py-8">Failed to load tracking data.</p>';
+  }
+}
+
+function closeTrack() {
+  document.getElementById('trackModal').classList.add('hidden');
+  document.getElementById('trackModal').classList.remove('flex');
+}
+
+document.getElementById('trackModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeTrack();
+});
+// Order Filtering and Pagination
+let currentOrderPage = 1;
+const ordersPerPage = 20;
+let filteredRows = [];
+
+// Dropdown Toggle Handlers for Orders Search Bar Filters
+function toggleOrdersDropdown(show) {
+  const dropdown = document.getElementById('orders-dropdown-menu');
+  const caret = document.getElementById('orders-caret-icon');
+  if (!dropdown) return;
+  
+  const isHidden = dropdown.classList.contains('hidden');
+  const shouldShow = (typeof show === 'boolean') ? show : isHidden;
+  
+  if (shouldShow) {
+    dropdown.classList.remove('hidden');
+    if (caret) caret.classList.add('rotate-180');
+  } else {
+    dropdown.classList.add('hidden');
+    if (caret) caret.classList.remove('rotate-180');
+  }
+}
+
+// Global outer-click controller for the dropdown menu
+document.addEventListener('click', function(event) {
+  const wrapper = document.getElementById('orders-search-wrapper');
+  if (wrapper && !wrapper.contains(event.target)) {
+    toggleOrdersDropdown(false);
+  }
+});
+
+// Attach click listener to dropdown toggle button
+document.addEventListener('DOMContentLoaded', () => {
+  const toggleBtn = document.getElementById('orders-dropdown-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleOrdersDropdown();
+    });
+  }
+  
+  // Real-time keystroke matching inside the search box
+  const searchInput = document.getElementById('orders-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', applyOrderFilters);
+    searchInput.addEventListener('focus', () => toggleOrdersDropdown(true));
+  }
+});
+
+function applyOrderFilters() {
+  // 1. Parse Search Keystroke
+  const searchInput = document.getElementById('orders-search-input');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  // 2. Parse Date Range
+  const rangeInput = document.getElementById('filter-date-range') ? document.getElementById('filter-date-range').value : '';
+  let from = '', to = '';
+  if (rangeInput && rangeInput.includes(' to ')) {
+    const parts = rangeInput.split(' to ');
+    from = parts[0];
+    to = parts[1];
+  } else if (rangeInput) {
+    from = to = rangeInput;
+  }
+
+  // 3. Parse Checkbox Filters
+  const checkedStatuses = Array.from(document.querySelectorAll('.order-status-checkbox:checked')).map(cb => cb.value);
+  const checkedRecons = Array.from(document.querySelectorAll('.order-recon-checkbox:checked')).map(cb => cb.value);
+
+  // 4. Scan Rows and Perform Instant Query Matching
+  const rows = document.querySelectorAll('.order-row');
+  filteredRows = [];
+
+  rows.forEach(row => {
+    const rowDate = row.dataset.date || '';
+    const rowStatus = row.dataset.status || '';
+    const rowRecon = row.dataset.recon || '';
+    const rowId = (row.dataset.id || '').toLowerCase();
+    const rowAddress = (row.dataset.address || '').toLowerCase();
+
+    const dateOk = (!from || rowDate >= from) && (!to || rowDate <= to);
+    const statusOk = checkedStatuses.length === 0 || checkedStatuses.includes(rowStatus);
+    const reconOk = checkedRecons.length === 0 || checkedRecons.includes(rowRecon);
+    const textOk = !query || rowId.includes(query) || rowAddress.includes(query);
+
+    if (dateOk && statusOk && reconOk && textOk) {
+      filteredRows.push(row);
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  // 5. Update Total Row Matches and Trigger Pagination Re-calculation
+  const matchCountEl = document.getElementById('order-match-count');
+  if (matchCountEl) {
+    matchCountEl.textContent = filteredRows.length;
+  }
+  currentOrderPage = 1; 
+  renderOrderPage();
+  
+  // 6. Dynamically Sync/Prepend Visual Pills inside the Search Bar Container
+  renderOrderFilterPills();
+}
+
+function renderOrderPage() {
+  const totalPages = Math.ceil(filteredRows.length / ordersPerPage) || 1;
+  if (currentOrderPage > totalPages) currentOrderPage = totalPages;
+  const startIndex = (currentOrderPage - 1) * ordersPerPage;
+  const endIndex = Math.min(startIndex + ordersPerPage, filteredRows.length);
+
+  filteredRows.forEach((row, index) => {
+    row.style.display = (index >= startIndex && index < endIndex) ? '' : 'none';
+  });
+
+  const paginationInfoEl = document.getElementById('pagination-info');
+  if (paginationInfoEl) {
+    paginationInfoEl.textContent = `Showing ${filteredRows.length > 0 ? startIndex + 1 : 0} to ${endIndex} of ${filteredRows.length} entries`;
+  }
+  
+  const prevBtn = document.getElementById('btn-prev-page');
+  const nextBtn = document.getElementById('btn-next-page');
+  if (prevBtn) prevBtn.disabled = currentOrderPage === 1;
+  if (nextBtn) nextBtn.disabled = currentOrderPage === totalPages;
+}
+
+function changeOrderPage(delta) { 
+  currentOrderPage += delta; 
+  renderOrderPage(); 
+}
+
+// Reconciliation Pagination
+let currentReconPage = 1;
+const reconPerPage = 20;
+function renderReconPage() {
+  const rows = Array.from(document.querySelectorAll('.recon-row'));
+  const totalPages = Math.ceil(rows.length / reconPerPage) || 1;
+  const startIndex = (currentReconPage - 1) * reconPerPage;
+  const endIndex = Math.min(startIndex + reconPerPage, rows.length);
+
+  rows.forEach((row, i) => row.style.display = (i >= startIndex && i < endIndex) ? '' : 'none');
+  document.getElementById('recon-pagination-info').textContent = `Showing ${rows.length > 0 ? startIndex + 1 : 0} to ${endIndex} of ${rows.length} entries`;
+  document.getElementById('btn-recon-prev').disabled = currentReconPage === 1;
+  document.getElementById('btn-recon-next').disabled = currentReconPage === totalPages;
+}
+function changeReconPage(delta) { currentReconPage += delta; renderReconPage(); }
+
+// Deposits Pagination
+let currentDepositPage = 1;
+const depositPerPage = 20;
+function renderDepositPage() {
+  const rows = Array.from(document.querySelectorAll('.deposit-row'));
+  const totalPages = Math.ceil(rows.length / depositPerPage) || 1;
+  const startIndex = (currentDepositPage - 1) * depositPerPage;
+  const endIndex = Math.min(startIndex + depositPerPage, rows.length);
+
+  rows.forEach((row, i) => row.style.display = (i >= startIndex && i < endIndex) ? '' : 'none');
+  document.getElementById('deposits-pagination-info').textContent = `Showing ${rows.length > 0 ? startIndex + 1 : 0} to ${endIndex} of ${rows.length} entries`;
+  document.getElementById('btn-deposits-prev').disabled = currentDepositPage === 1;
+  document.getElementById('btn-deposits-next').disabled = currentDepositPage === totalPages;
+}
+function changeDepositPage(delta) { currentDepositPage += delta; renderDepositPage(); }
+
+// Dynamic Pill Injection Controller
+function renderOrderFilterPills() {
+  const pillsContainer = document.getElementById('orders-pills-container');
+  const searchInput = document.getElementById('orders-search-input');
+  if (!pillsContainer || !searchInput) return;
+
+  // Clear existing pills but keep the search input element
+  const existingPills = pillsContainer.querySelectorAll('.order-filter-pill');
+  existingPills.forEach(pill => pill.remove());
+
+  let totalPillsCount = 0;
+
+  // Render Status Checkbox Pills
+  const checkedStatuses = Array.from(document.querySelectorAll('.order-status-checkbox:checked'));
+  checkedStatuses.forEach(cb => {
+    const value = cb.value;
+    const labelStr = value.charAt(0).toUpperCase() + value.slice(1);
+    createPillElement(pillsContainer, searchInput, `Status: ${labelStr}`, 'status', value);
+    totalPillsCount++;
+  });
+
+  // Render Reconciliation Checkbox Pills
+  const checkedRecons = Array.from(document.querySelectorAll('.order-recon-checkbox:checked'));
+  checkedRecons.forEach(cb => {
+    const value = cb.value;
+    createPillElement(pillsContainer, searchInput, `Recon: ${value}`, 'recon', value);
+    totalPillsCount++;
+  });
+
+  // Render Date Range Pill
+  const rangeVal = document.getElementById('filter-date-range') ? document.getElementById('filter-date-range').value : '';
+  if (rangeVal) {
+    createPillElement(pillsContainer, searchInput, `Date: ${rangeVal}`, 'date', rangeVal);
+    totalPillsCount++;
+  }
+
+  // Handle dynamic placeholder visibility based on active tags
+  if (totalPillsCount > 0) {
+    searchInput.placeholder = '';
+  } else {
+    searchInput.placeholder = 'Search Order ID or Pickup Address...';
+  }
+}
+
+// Helper to construct interactive badge markup
+function createPillElement(container, referenceNode, text, type, value) {
+  const span = document.createElement('span');
+  span.className = "order-filter-pill inline-flex items-center gap-1 bg-orange-50 text-[#f97316] text-[10px] font-bold px-2 py-0.5 rounded border border-orange-300 transition-all";
+  span.innerHTML = `
+    <span>${text}</span>
+    <button type="button" class="hover:text-red-500 font-bold ml-0.5 text-xs transition-colors" style="line-height:1;" onclick="clearSpecificOrderFilter('${type}', '${value}')">&times;</button>
+  `;
+  container.insertBefore(span, referenceNode);
+}
+
+// Clear individual active filter badge and sync checkbox state
+function clearSpecificOrderFilter(type, value) {
+  if (type === 'status') {
+    const cb = Array.from(document.querySelectorAll('.order-status-checkbox')).find(c => cbValEquals(c.value, value));
+    if (cb) cb.checked = false;
+  } else if (type === 'recon') {
+    const cb = Array.from(document.querySelectorAll('.order-recon-checkbox')).find(c => cbValEquals(c.value, value));
+    if (cb) cb.checked = false;
+  } else if (type === 'date') {
+    if (typeof datePicker !== 'undefined' && datePicker) {
+      datePicker.clear();
+    } else {
+      const dateInput = document.getElementById('filter-date-range');
+      if (dateInput && dateInput._flatpickr) {
+        dateInput._flatpickr.clear();
+      }
+    }
+  }
+  applyOrderFilters();
+}
+
+// Helper equality check for status values
+function cbValEquals(val1, val2) {
+  return String(val1).trim().toLowerCase() === String(val2).trim().toLowerCase();
+}
+
+function resetOrderFilters() {
+  // Clear checkboxes
+  document.querySelectorAll('.order-status-checkbox').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.order-recon-checkbox').forEach(cb => cb.checked = false);
+
+  // Clear search query text
+  const searchInput = document.getElementById('orders-search-input');
+  if (searchInput) searchInput.value = '';
+
+  // Clear Flatpickr range
+  if (typeof datePicker !== 'undefined' && datePicker) {
+    datePicker.clear();
+  } else {
+    const dateInput = document.getElementById('filter-date-range');
+    if (dateInput && dateInput._flatpickr) {
+      dateInput._flatpickr.clear();
+    }
+  }
+
+  // Dismiss dropdown
+  toggleOrdersDropdown(false);
+
+  // Apply filters
+  applyOrderFilters();
+}
+
+// Initialize all on load
+document.addEventListener('DOMContentLoaded', () => {
+  applyOrderFilters();
+  renderReconPage();
+  renderDepositPage();
+  fetchYangoLiveProfile();
+  loadChatter();
+});
+
+const DRIVER_ID = {{ driver.id }};
+
+function categoryBadge(cat) {
+  const map = {
+    econom: ['bg-gray-100 text-gray-600', 'Econom'],
+    comfort: ['bg-blue-100 text-blue-700', 'Comfort'],
+    comfort_plus: ['bg-indigo-100 text-indigo-700', 'Comfort+'],
+    business: ['bg-yellow-100 text-yellow-800', 'Business'],
+    minivan: ['bg-green-100 text-green-700', 'Minivan'],
+    vip: ['bg-orange-100 text-orange-700', 'VIP'],
+    suv: ['bg-orange-100 text-orange-700', 'SUV'],
+    premium_suv: ['bg-amber-100 text-amber-800', 'Premium SUV'],
+    premium_van: ['bg-cyan-100 text-cyan-700', 'Premium Van'],
+    cargo: ['bg-slate-100 text-slate-700', 'Cargo'],
+    express: ['bg-pink-100 text-pink-700', 'Express'],
+    pool: ['bg-emerald-100 text-emerald-700', 'Pool'],
+    ultimate: ['bg-indigo-900 text-indigo-200', 'Ultimate'],
+    maybach: ['bg-slate-900 text-slate-200', 'Maybach'],
+    personal_driver: ['bg-violet-100 text-violet-700', 'Personal'],
+    child_tariff: ['bg-fuchsia-100 text-fuchsia-700', 'Kids'],
+    start: ['bg-gray-100 text-gray-600', 'Start'], standart: ['bg-gray-100 text-gray-600', 'Standard'], wagon: ['bg-gray-100 text-gray-600', 'Wagon'],
+  };
+  if (!cat) return '—';
+  const [cls, label] = map[cat] || ['bg-gray-100 text-gray-600', cat.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())];
+  return `<span class="px-2.5 py-1 border border-black/5 rounded-lg text-[10px] font-bold uppercase tracking-widest ${cls}">${label}</span>`;
+}
+
+function paymentBadge(method) {
+  if (method === 'cash') return '<span class="text-xs font-bold text-green-700">💵 Cash</span>';
+  if (method === 'card') return '<span class="text-xs font-bold text-blue-700">💳 Card</span>';
+  if (method === 'cashless') return '<span class="text-xs font-bold text-orange-700">📲 Cashless</span>';
+  return method ? `<span class="text-xs">${method}</span>` : '—';
+}
+
+function statusBadge(s) {
+  const cls = s === 'complete' ? 'bg-green-100 text-green-700' : s === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600';
+  return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${cls}">${s}</span>`;
+}
+
+function fmtDate(dt) { return dt ? dt.substring(0, 10) : '—'; }
+function fmtTime(dt) { return dt ? dt.substring(11, 16) : '—'; }
+
+
+let driverSyncIntervalId = null;
+
+function openDriverSyncWizard() {
+  document.getElementById('driver-sync-wizard-modal').classList.remove('hidden');
+  document.getElementById('driver-sync-wizard-modal').classList.add('flex');
+  checkDriverSyncStatus();
+}
+
+function closeDriverSyncWizard() {
+  document.getElementById('driver-sync-wizard-modal').classList.add('hidden');
+  document.getElementById('driver-sync-wizard-modal').classList.remove('flex');
+  if (driverSyncIntervalId) {
+    clearInterval(driverSyncIntervalId);
+    driverSyncIntervalId = null;
+  }
+}
+
+async function checkDriverSyncStatus() {
+  try {
+    const res = await fetch(`/api/drivers/{{ driver.id }}/sync-status`);
+    const data = await res.json();
+    updateDriverSyncUI(data);
+  } catch (error) {
+    console.error('Error fetching driver sync status:', error);
+  }
+}
+
+function updateDriverSyncUI(data) {
+  const active = data.active;
+  const lastSync = data.last_sync;
+
+  // Update Last Sync Time
+  const lastTimeSpan = document.getElementById('driver-sync-last-time');
+  if (lastSync) {
+    const dateObj = new Date(lastSync);
+    lastTimeSpan.textContent = dateObj.toLocaleString();
+  } else {
+    lastTimeSpan.textContent = 'Never';
+  }
+
+  const loader = document.getElementById('driver-sync-loader');
+  const headerPulse = document.getElementById('driver-sync-header-pulse');
+  const actionBtn = document.getElementById('btn-driver-sync-action');
+  const statsContainer = document.getElementById('driver-sync-stats-container');
+  const progressContainer = document.getElementById('driver-sync-progress-container');
+  const progressBar = document.getElementById('driver-sync-progress-bar');
+  const progressPct = document.getElementById('driver-sync-progress-pct');
+  const statusTitle = document.getElementById('driver-sync-status-title');
+  const statusDesc = document.getElementById('driver-sync-status-desc');
+
+  if (active.status === 'running') {
+    // Running State
+    if (active.is_bulk) {
+      if (active.is_this_driver) {
+        statusTitle.textContent = 'Bulk Syncing (Active)';
+        statusDesc.textContent = 'A system-wide bulk sync is running and currently processing this driver. Please wait...';
+      } else {
+        statusTitle.textContent = 'Bulk Sync in Progress';
+        statusDesc.textContent = `A system-wide bulk sync is in progress (currently processing: ${active.current_driver || '...'}). Individual sync is locked.`;
+      }
+    } else {
+      statusTitle.textContent = 'Syncing Orders...';
+      statusDesc.textContent = 'We are fetching and verifying trips from Yango in the background. You can safely close this wizard or browse elsewhere.';
+    }
+    
+    loader.className = 'w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 mb-4 animate-spin';
+    loader.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`;
+    headerPulse.className = 'w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping';
+
+    // Show Stats
+    statsContainer.classList.remove('hidden');
+    document.getElementById('driver-sync-stat-inserted').textContent = active.trips_inserted;
+    document.getElementById('driver-sync-stat-updated').textContent = active.trips_updated;
+
+    // Show Progress Bar
+    progressContainer.classList.remove('hidden');
+    progressBar.style.width = `${active.progress}%`;
+    progressPct.textContent = `${active.progress}%`;
+
+    // Disable Action Button & Show Status
+    actionBtn.disabled = true;
+    actionBtn.className = 'flex-1 px-4 py-3 bg-gray-100 text-gray-400 text-xs font-bold uppercase rounded-xl transition-all duration-150 text-center cursor-not-allowed';
+    actionBtn.textContent = 'Syncing...';
+
+    // Start Polling if not already polling
+    if (!driverSyncIntervalId) {
+      driverSyncIntervalId = setInterval(checkDriverSyncStatus, 1500);
+    }
+  } else {
+    // Idle, Completed, or Failed
+    headerPulse.className = 'w-2.5 h-2.5 rounded-full bg-orange-500';
+    loader.className = 'w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-4';
+    loader.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`;
+    
+    // Enable Start Button
+    actionBtn.disabled = false;
+    actionBtn.className = 'flex-1 px-4 py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-orange-500/10 hover:shadow-orange-500/20 transition-all active:scale-95 duration-150 text-center';
+    actionBtn.textContent = 'Start Sync';
+
+    if (active.status === 'completed') {
+      statusTitle.textContent = 'Sync Complete!';
+      statusDesc.textContent = `Trips synced successfully from Yango API.`;
+      
+      statsContainer.classList.remove('hidden');
+      document.getElementById('driver-sync-stat-inserted').textContent = active.trips_inserted;
+      document.getElementById('driver-sync-stat-updated').textContent = active.trips_updated;
+
+      progressContainer.classList.remove('hidden');
+      progressBar.style.width = '100%';
+      progressPct.textContent = '100%';
+
+      // Reload after a short delay if we just finished (to see new metrics on the tables)
+      if (driverSyncIntervalId) {
+        clearInterval(driverSyncIntervalId);
+        driverSyncIntervalId = null;
+        setTimeout(() => window.location.reload(), 2000);
+      }
+    } else if (active.status === 'failed') {
+      statusTitle.textContent = 'Sync Failed';
+      statusDesc.textContent = `An error occurred: ${active.error || 'Unknown Error'}`;
+      statsContainer.classList.add('hidden');
+      progressContainer.classList.add('hidden');
+
+      if (driverSyncIntervalId) {
+        clearInterval(driverSyncIntervalId);
+        driverSyncIntervalId = null;
+      }
+    } else {
+      // Idle
+      statusTitle.textContent = 'Sync Yango Trips';
+      statusDesc.textContent = "Start synchronization to fetch this driver's latest trips and revenue logs directly from Yango API.";
+      statsContainer.classList.add('hidden');
+      progressContainer.classList.add('hidden');
+
+      if (driverSyncIntervalId) {
+        clearInterval(driverSyncIntervalId);
+        driverSyncIntervalId = null;
+      }
+    }
+  }
+}
+
+async function startDriverSyncProcess() {
+  try {
+    const res = await fetch(`/api/drivers/{{ driver.id }}/sync-orders`, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'started' || data.status === 'running') {
+      checkDriverSyncStatus();
+    } else {
+      alert(data.message || 'Failed to start sync');
+    }
+  } catch (error) {
+    console.error('Error starting driver sync:', error);
+    alert('Failed to start sync. Please try again.');
+  }
+}
+
+// Auto-check on page load
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch(`/api/drivers/{{ driver.id }}/sync-status`);
+    const data = await res.json();
+    if (data.active && data.active.status === 'running') {
+      openDriverSyncWizard();
+    }
+  } catch (err) {
+    console.error('Error in auto driver sync check:', err);
+  }
+});
+
+// Name Editing
+function toggleNameEdit() {
+  const display = document.getElementById('driver-name-display').parentElement;
+  const edit = document.getElementById('driver-name-edit-wrap');
+  if (edit.classList.contains('hidden')) {
+    display.classList.add('hidden');
+    edit.classList.remove('hidden');
+    edit.classList.add('flex');
+    document.getElementById('driver-name-input').focus();
+  } else {
+    display.classList.remove('hidden');
+    edit.classList.add('hidden');
+    edit.classList.remove('flex');
+  }
+}
+
+async function saveDriverName() {
+  const newName = document.getElementById('driver-name-input').value.trim();
+  if (!newName) return alert('Name cannot be empty');
+  
+  try {
+    const formData = new FormData();
+    formData.append('name', newName);
+    const res = await fetch(`/api/drivers/{{ driver.id }}/update-name`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Update failed');
+    
+    document.getElementById('driver-name-display').textContent = newName;
+    toggleNameEdit();
+    // Update avatar initial safely
+    const initialsEl = document.getElementById('avatar-initials');
+    if (initialsEl) {
+      initialsEl.textContent = newName[0].toUpperCase();
+    }
+    const previewInitialsEl = document.getElementById('avatar-preview-initials');
+    if (previewInitialsEl) {
+      previewInitialsEl.textContent = newName[0].toUpperCase();
+    }
+  } catch(e) {
+    alert('Failed to update name.');
+  }
+}
+
+// Avatar Upload
+function triggerAvatarUpload(event) {
+  event.stopPropagation();
+  document.getElementById('avatar-file-input').click();
+}
+
+function handleAvatarFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  if (!file.type.startsWith('image/')) {
+    alert('Please select an image file');
+    return;
+  }
+  
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Image file is too large (max 2MB)');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64Data = e.target.result;
+    
+    try {
+      const res = await fetch(`/api/drivers/{{ driver.id }}/update-avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ avatar_data: base64Data })
+      });
+      
+      if (!res.ok) throw new Error('Avatar upload failed');
+      
+      // Update UI in real-time
+      const container = document.getElementById('avatar-container');
+      container.innerHTML = '';
+      
+      const img = document.createElement('img');
+      img.id = 'avatar-img';
+      img.src = base64Data;
+      img.className = 'w-full h-full object-cover';
+      container.appendChild(img);
+      
+      const overlay = document.createElement('div');
+      overlay.onclick = triggerAvatarUpload;
+      overlay.className = 'absolute inset-0 bg-black/45 flex items-center justify-center cursor-pointer opacity-0 group-hover/avatar:opacity-100 transition-all duration-200 text-white';
+      overlay.title = 'Upload Photo';
+      overlay.innerHTML = `
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      `;
+      container.appendChild(overlay);
+
+      // Update popover preview in real-time
+      const previewWrap = document.getElementById('preview-image-wrap');
+      if (previewWrap) {
+        previewWrap.innerHTML = '';
+        const previewImg = document.createElement('img');
+        previewImg.id = 'avatar-preview-img';
+        previewImg.src = base64Data;
+        previewImg.className = 'w-full h-full object-cover';
+        previewWrap.appendChild(previewImg);
+      }
+    } catch(err) {
+      alert('Failed to upload profile picture.');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// Operator ID Editing
+function toggleOperatorEdit() {
+  const view = document.getElementById('operator-id-view');
+  const edit = document.getElementById('operator-id-edit-wrap');
+  if (edit.classList.contains('hidden')) {
+    view.classList.add('hidden');
+    edit.classList.remove('hidden');
+    edit.classList.add('flex');
+    document.getElementById('operator-id-input').focus();
+  } else {
+    view.classList.remove('hidden');
+    edit.classList.add('hidden');
+    edit.classList.remove('flex');
+  }
+}
+
+async function saveOperatorId() {
+  const newId = document.getElementById('operator-id-input').value.trim();
+  if (!newId) return alert('Operator ID cannot be empty');
+  
+  try {
+    const formData = new FormData();
+    formData.append('operator_id', newId);
+    const res = await fetch(`/api/drivers/{{ driver.id }}/update-operator-id`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Update failed');
+    
+    document.getElementById('operator-id-display').textContent = newId;
+    toggleOperatorEdit();
+  } catch(e) {
+    alert('Failed to update Operator ID.');
+  }
+}
+
+// Shift Editing
+function toggleShiftEdit() {
+  const view = document.getElementById('shift-view');
+  const edit = document.getElementById('shift-edit-wrap');
+  if (edit.classList.contains('hidden')) {
+    view.classList.add('hidden');
+    edit.classList.remove('hidden');
+    edit.classList.add('flex');
+  } else {
+    view.classList.remove('hidden');
+    edit.classList.add('hidden');
+    edit.classList.remove('flex');
+  }
+}
+
+async function saveShift() {
+  const newShift = document.getElementById('shift-input').value;
+  try {
+    const formData = new FormData();
+    formData.append('shift', newShift);
+    const res = await fetch(`/api/drivers/{{ driver.id }}/update-shift`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Update failed');
+    window.location.reload();
+  } catch(e) {
+    alert('Failed to update shift.');
+  }
+}
+
+function copyToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<svg class="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+        setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
+
+// Yango Live Data Fetching
+async function fetchYangoLiveProfile() {
+  const container = document.getElementById('yango-live-content');
+  const pillWrap = document.getElementById('yango-live-pill');
+  
+  try {
+    const res = await fetch(`/api/yango/drivers/{{ driver.yango_driver_id }}`);
+    if (!res.ok) throw new Error('Live data unavailable');
+    const merged = await res.json();
+    
+    const v1 = merged.v1 || {};
+    const v2 = merged.v2 || {};
+    
+    const profile = v1.driver_profile || {};
+    const car = v1.car || {};
+    const account = v1.account || {};
+    const person2 = v2.person || {};
+    const fullName2 = person2.full_name || {};
+    const license = person2.driver_license || {};
+    const employment = v2.profile || {};
+    
+    // Account & Balance handling
+    const balanceVal = account.balance !== undefined ? parseFloat(account.balance).toLocaleString() : '—';
+    const currencyVal = account.currency || v2.account?.currency || 'ETB';
+    const limitVal = v2.account?.balance_limit || '—';
+    
+    // Update Pill
+    const s = employment.work_status || profile.work_status || 'unknown';
+    const sColorClass = s === 'working' ? 'bg-green-100 text-green-700 border-green-200' : s === 'offline' ? 'bg-gray-100 text-gray-600 border-gray-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    pillWrap.innerHTML = `<span class="px-2.5 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-widest ${sColorClass}">${s}</span>`;
+    
+    container.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Column 1: Personal & License (Live) -->
+        <div>
+          <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Contractor Identity (Live)</h4>
+          <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden mb-4 shadow-sm">
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Full Name</div><div class="text-sm font-black text-gray-900">${fullName2.first_name || profile.first_name || ''} ${fullName2.middle_name || profile.middle_name || ''} ${fullName2.last_name || profile.last_name || ''}</div></div>
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">API Contact</div><div class="text-sm font-semibold text-gray-700">${person2.contact_info?.phone || profile.phones?.[0] || '—'} · ${person2.contact_info?.email || '—'}</div></div>
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Employment</div><div class="text-sm font-semibold text-gray-700 capitalize">${person2.employment_type?.replace('_',' ') || '—'} · ${employment.work_status || '—'}</div></div>
+          </div>
+          
+          <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Driver License</div><div class="text-[13px] font-mono font-bold text-gray-900">${license.number || '—'} (${license.country?.toUpperCase() || '—'})</div></div>
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">License Dates</div><div class="text-xs text-gray-600 font-semibold">Issue: ${license.issue_date || '—'} · Expiry: ${license.expiry_date || '—'}</div></div>
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Birth Date</div><div class="text-sm font-semibold text-gray-700">${license.birth_date || '—'}</div></div>
+          </div>
+        </div>
+        
+        <!-- Column 2: Vehicle & Rule (Live) -->
+        <div>
+          <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Vehicle & Work Rule (Live)</h4>
+          <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden mb-4 shadow-sm">
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Car Brand/Model</div><div class="text-sm font-semibold text-gray-700">${car.brand || '—'} ${car.model || ''} (${car.year || '—'})</div></div>
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">License Plate</div><div class="text-[15px] font-mono font-black text-gray-900">${car.number || '—'}</div></div>
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Callsign / Color</div><div class="text-sm font-semibold text-gray-700">${car.callsign || '—'} · ${car.color || '—'}</div></div>
+          </div>
+          
+          <div class="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Work Rule ID</div><div class="text-[11px] font-mono font-bold text-gray-600">${v2.account?.work_rule_id || profile.work_rule_id || '—'}</div></div>
+            <div class="flex flex-col gap-1 px-5 py-3 border-b border-gray-200 last:border-0"><div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Service Dates</div><div class="text-xs text-gray-600 font-semibold">Hired: ${employment.hire_date || '—'} · Fired: ${employment.fire_date || '—'}</div></div>
+          </div>
+        </div>
+
+        <!-- Column 3: Status & Financials (Live) -->
+        <div>
+          <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Live Status & Account</h4>
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-4 shadow-sm">
+            <div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-1">Live Balance</div>
+            <div class="flex items-baseline gap-2">
+              <div class="text-3xl font-black text-blue-600">${balanceVal}</div>
+              <div class="text-sm font-bold text-gray-500">${currencyVal}</div>
+            </div>
+            <div class="mt-2 text-[11px] font-bold text-gray-500">Limit: ${limitVal} · Block on Low: ${v2.account?.block_orders_on_balance_below_limit ? 'Yes' : 'No'}</div>
+          </div>
+
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm">
+             <div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Current Activity</div>
+             <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full ${s === 'working' ? 'bg-green-500' : s === 'offline' ? 'bg-gray-400' : 'bg-yellow-500'}"></div>
+                <div class="text-base font-bold text-gray-900 capitalize">${s}</div>
+             </div>
+             <div class="mt-3 text-[11px] font-bold text-gray-400">Last Sync: ${new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    
+  } catch(e) {
+    pillWrap.innerHTML = '<span class="px-2.5 py-1 bg-red-100 text-red-700 border border-red-200 rounded-lg text-[10px] font-bold uppercase tracking-widest">API Offline</span>';
+    container.innerHTML = `
+      <div class="text-center p-8 text-red-500">
+        <p class="font-bold text-lg">Unable to connect to Yango Fleet API.</p>
+        <p class="text-sm mt-2 opacity-80">This may be due to rate limits or invalid Operator ID.</p>
+      </div>
+    `;
+  }
+}
+
+async function toggleType() {
+  const currentType = '{{ driver.driver_type }}';
+  const targetType = currentType === 'internal' ? 'external' : 'internal';
+  
+  const formData = new FormData();
+  formData.append('driver_id', '{{ driver.id }}');
+  formData.append('driver_type', targetType);
+  
+  try {
+    const res = await fetch('/api/drivers/update-type', {
+      method: 'POST',
+      body: formData
+    });
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      alert('Failed to update driver type');
+    }
+  } catch(e) {
+    alert('Error toggling driver type');
+  }
+}
+
+async function loadChatter() {
+  const timeline = document.getElementById('chatter-timeline');
+  const countSpan = document.getElementById('chatter-count');
+  
+  try {
+    const res = await fetch(`/api/drivers/{{ driver.id }}/audit-logs`);
+    const logs = await res.json();
+    
+    if (!logs.length) {
+      timeline.innerHTML = `
+        <div class="text-center py-8 text-gray-400 italic text-xs select-none">
+          No chatter history recorded yet. Use the area above to log your first internal note!
+        </div>
+      `;
+      countSpan.textContent = "0 entries";
+      return;
+    }
+    
+    countSpan.textContent = `${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}`;
+    
+    timeline.innerHTML = logs.map(log => {
+      const isNote = log.field === 'note';
+      const dateStr = new Date(log.timestamp).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      
+      if (isNote) {
+        // User note/comment style
+        const initial = log.username ? log.username[0].toUpperCase() : 'U';
+        return `
+          <div class="relative group">
+            <!-- Timeline dot -->
+            <div class="absolute -left-[31px] top-2.5 w-4 h-4 rounded-full bg-white border-2 border-[#f97316] flex items-center justify-center shadow-sm">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#f97316]"></span>
+            </div>
+            
+            <div class="bg-white border border-gray-200 hover:border-gray-300 rounded-lg shadow-sm p-4 transition-all hover:shadow">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-full bg-[#f97316]/10 text-[#f97316] flex items-center justify-center text-xs font-black uppercase shadow-inner border border-[#f97316]/5">
+                    ${initial}
+                  </div>
+                  <div>
+                    <span class="text-xs font-bold text-gray-850">${log.username}</span>
+                    <span class="text-[10px] text-[#f97316] font-bold ml-1.5 px-1.5 py-0.5 bg-[#f97316]/5 rounded">Note</span>
+                  </div>
+                </div>
+                <span class="text-[10px] text-gray-400 font-bold font-mono select-none">${dateStr}</span>
+              </div>
+              <div class="text-sm text-gray-750 font-semibold leading-relaxed pl-9 whitespace-pre-line">
+                ${escapeHTML(log.new)}
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        // System / Admin update style
+        const fieldPretty = log.field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        return `
+          <div class="relative group">
+            <!-- Timeline dot -->
+            <div class="absolute -left-[28px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center shadow-sm">
+              <span class="w-1 h-1 rounded-full bg-gray-400"></span>
+            </div>
+            
+            <div class="flex items-start gap-2.5 text-xs text-gray-500 hover:text-gray-750 transition-colors pl-2">
+              <div class="p-1 bg-gray-150 rounded border border-gray-200 shadow-sm flex-shrink-0">
+                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+              </div>
+              <div class="flex-1 py-0.5 leading-snug">
+                <span class="font-bold text-gray-700">${log.username}</span> updated 
+                <span class="font-bold text-[#f97316] px-1 bg-[#f97316]/5 rounded border border-[#f97316]/10">${fieldPretty}</span> 
+                from <span class="font-mono text-gray-500 font-semibold px-0.5">${log.old || '—'}</span> 
+                to <span class="font-mono text-gray-850 font-bold px-0.5">${log.new || '—'}</span>
+              </div>
+              <span class="text-[10px] text-gray-400 font-bold font-mono whitespace-nowrap pt-1 select-none">${dateStr}</span>
+            </div>
+          </div>
+        `;
+      }
+    }).join('');
+    
+  } catch(e) {
+    timeline.innerHTML = `
+      <div class="text-center py-6 text-red-500 italic text-xs select-none">
+        Failed to load Chatter entries.
+      </div>
+    `;
+  }
+}
+
+async function submitChatterNote(e) {
+  e.preventDefault();
+  const textarea = document.getElementById('chatter-textarea');
+  const btn = document.getElementById('btn-submit-note');
+  const noteText = textarea.value.trim();
+  
+  if (!noteText) return;
+  
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = `<svg class="animate-spin w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+  
+  const formData = new FormData();
+  formData.append('note', noteText);
+  
+  try {
+    const res = await fetch(`/api/drivers/{{ driver.id }}/add-note`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (res.ok) {
+      textarea.value = '';
+      await loadChatter(); // Dynamically reload timeline!
+      
+      // If the 'History of Changes' tab is active, reload its table too
+      const activeTabBtn = document.querySelector('.tab-btn.active');
+      if (activeTabBtn && activeTabBtn.dataset.tab === 'history') {
+        fetchAuditLogs();
+      }
+    } else {
+      alert('Failed to save note.');
+    }
+  } catch(e) {
+    alert('Error saving note.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return str.replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+}
+
+function toggleReconDateEdit() {
+    const view = document.getElementById('recon-date-view');
+    const edit = document.getElementById('recon-date-edit-wrap');
+    if (view.style.display === 'none') {
+        view.style.display = 'block';
+        edit.style.display = 'none';
+    } else {
+        view.style.display = 'none';
+        edit.style.display = 'flex';
+        // Initialize Flatpickr if not already initialized
+        if (!edit.dataset.fp) {
+            flatpickr("#recon-date-input", {
+                dateFormat: "Y-m-d",
+                allowInput: true
+            });
+            edit.dataset.fp = true;
+        }
+    }
+}
+
+async function saveReconDate() {
+    const reconDate = document.getElementById('recon-date-input').value;
+    const formData = new FormData();
+    formData.append('recon_date', reconDate);
+
+    try {
+        const response = await fetch('/api/drivers/{{ driver.id }}/update-recon-date', {
+            method: 'POST',
+            body: formData
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            alert('Failed to update reconciliation date');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred');
+    }
+}
+
+// Manage Receipts & Deposits Modal Logic
+let currentManageTripId = null;
+let currentManageTripPrice = 0.0;
+let currentManageTripDeposited = 0.0;
+
+function openManageReceiptsModal(tripId, price, currentDeposit) {
+    currentManageTripId = tripId;
+    currentManageTripPrice = parseFloat(price) || 0.0;
+    currentManageTripDeposited = parseFloat(currentDeposit) || 0.0;
+    
+    // Update KPI UI
+    document.getElementById('manage-trip-price').textContent = currentManageTripPrice.toFixed(2) + ' ETB';
+    document.getElementById('manage-trip-deposited').textContent = currentManageTripDeposited.toFixed(2) + ' ETB';
+    const remaining = Math.max(0, currentManageTripPrice - currentManageTripDeposited);
+    document.getElementById('manage-trip-remaining').textContent = remaining.toFixed(2) + ' ETB';
+    
+    // Reset Form Fields
+    document.getElementById('deposit-remaining-display').value = '0.00';
+    document.getElementById('deposit-amount-input').value = '';
+    
+    // Populate Currently Linked Receipts
+    // We will find the table row for this trip and read the `data-links` attribute
+    const row = document.querySelector(`.order-row[data-id="${tripId}"]`);
+    const listContainer = document.getElementById('linked-receipts-list');
+    listContainer.innerHTML = '';
+    
+    if (row && row.dataset.links) {
+        try {
+            const links = JSON.parse(row.dataset.links);
+            if (links && links.length > 0) {
+                links.forEach(link => {
+                    const txIdShort = link.transaction_id.length > 8 ? link.transaction_id.substring(link.transaction_id.length - 8) : link.transaction_id;
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between bg-slate-50 border border-slate-200/50 p-2.5 rounded-xl text-xs';
+                    item.innerHTML = `
+                        <div class="flex flex-col">
+                            <span class="font-extrabold text-slate-800 font-mono">Receipt: ...${txIdShort}</span>
+                            <span class="text-[10px] text-gray-400 font-bold font-mono">${link.amount_applied.toFixed(2)} ETB applied</span>
+                        </div>
+                        <button onclick="unlinkDeposit('${tripId}', '${link.transaction_id}')" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 font-bold uppercase rounded-lg border border-red-200/50 text-[10px] transition-all flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Unlink
+                        </button>
+                    `;
+                    listContainer.appendChild(item);
+                });
+            } else {
+                listContainer.innerHTML = '<p class="text-xs text-gray-400 italic py-2 text-center">No receipts linked yet.</p>';
+            }
+        } catch (e) {
+            console.error('Error parsing row links', e);
+            listContainer.innerHTML = '<p class="text-xs text-red-500 italic py-2 text-center">Error loading linked receipts.</p>';
+        }
+    } else {
+        listContainer.innerHTML = '<p class="text-xs text-gray-400 italic py-2 text-center">No receipts linked yet.</p>';
+    }
+    
+    // Check if the trip is already fully paid or verified
+    const isVerified = (row && row.dataset.recon === 'Verified') || (remaining < 0.01);
+    const markPaidBtn = document.getElementById('btn-mark-trip-paid');
+    if (markPaidBtn) {
+        if (isVerified) {
+            markPaidBtn.disabled = true;
+            markPaidBtn.className = "w-full px-4 py-2.5 bg-gray-100 text-gray-400 text-xs font-bold uppercase rounded-xl transition-all duration-150 text-center flex items-center justify-center gap-1.5 cursor-not-allowed border border-gray-200/50";
+            markPaidBtn.innerHTML = `
+                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                Already Fully Paid (Verified)
+            `;
+        } else {
+            markPaidBtn.disabled = false;
+            markPaidBtn.className = "w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all active:scale-95 duration-150 text-center flex items-center justify-center gap-1.5";
+            markPaidBtn.innerHTML = `
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Mark Trip as Paid (Direct Cash)
+            `;
+        }
+    }
+
+    // Fetch and populate available deposits
+    fetchAvailableDeposits(remaining);
+    
+    // Open modal
+    document.getElementById('manageReceiptsModal').classList.remove('hidden');
+    document.getElementById('manageReceiptsModal').classList.add('flex');
+}
+
+function closeManageReceiptsModal() {
+    document.getElementById('manageReceiptsModal').classList.add('hidden');
+    document.getElementById('manageReceiptsModal').classList.remove('flex');
+}
+
+async function markManageTripPaid() {
+    if (!currentManageTripId) return;
+    
+    const row = document.querySelector(`.order-row[data-id="${currentManageTripId}"]`);
+    const remaining = Math.max(0, currentManageTripPrice - currentManageTripDeposited);
+    const isVerified = (row && row.dataset.recon === 'Verified') || (remaining < 0.01);
+    if (isVerified) {
+        alert("This trip is already fully paid or verified.");
+        return;
+    }
+    
+    const notes = prompt("Enter manager notes for this direct physical cash settlement (optional):", `Manual Cash payment of ${currentManageTripPrice.toFixed(2)} ETB received in office.`);
+    if (notes === null) return; // User cancelled
+    
+    const formData = new FormData();
+    formData.append('status', 'Verified');
+    formData.append('deposited_amount', currentManageTripPrice);
+    formData.append('notes', notes);
+    
+    try {
+        const res = await fetch(`/api/trips/${currentManageTripId}/resolve`, {
+            method: 'POST',
+            body: formData
+        });
+        if (res.ok) {
+            alert('Trip successfully marked as Paid (Verified).');
+            window.location.reload();
+        } else {
+            alert('Failed to mark trip as paid');
+        }
+    } catch (err) {
+        alert('Error communicating with server');
+    }
+}
+
+async function fetchAvailableDeposits(recommendedAmount) {
+    const select = document.getElementById('available-deposits-select');
+    select.innerHTML = '<option value="">Loading available deposits...</option>';
+    
+    try {
+        const res = await fetch(`/api/drivers/{{ driver.id }}/available-deposits`);
+        if (!res.ok) {
+            throw new Error('Failed to fetch deposits');
+        }
+        
+        const deposits = await res.json();
+        select.innerHTML = '';
+        
+        if (deposits && deposits.length > 0) {
+            // Store deposits globally for reference
+            window.availableDepositsMap = {};
+            
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '-- Choose a receipt --';
+            select.appendChild(defaultOpt);
+            
+            deposits.forEach(d => {
+                window.availableDepositsMap[d.transaction_id] = d;
+                const opt = document.createElement('option');
+                opt.value = d.transaction_id;
+                const shortTx = d.transaction_id.length > 8 ? d.transaction_id.substring(d.transaction_id.length - 8) : d.transaction_id;
+                opt.textContent = `...${shortTx} (${d.remaining.toFixed(2)} ETB remaining) — ${d.timestamp}`;
+                select.appendChild(opt);
+            });
+            
+            // Setup default suggestion on selection change or keep empty
+        } else {
+            select.innerHTML = '<option value="">-- No available deposits found --</option>';
+        }
+    } catch (err) {
+        console.error(err);
+        select.innerHTML = '<option value="">Error loading deposits</option>';
+    }
+}
+
+function onDepositSelectChange() {
+    const txId = document.getElementById('available-deposits-select').value;
+    const remainingInput = document.getElementById('deposit-remaining-display');
+    const amountInput = document.getElementById('deposit-amount-input');
+    
+    if (txId && window.availableDepositsMap && window.availableDepositsMap[txId]) {
+        const deposit = window.availableDepositsMap[txId];
+        remainingInput.value = deposit.remaining.toFixed(2);
+        
+        // Auto-fill suggested amount: min(deposit.remaining, trip remaining price)
+        const tripRemaining = Math.max(0, currentManageTripPrice - currentManageTripDeposited);
+        const suggested = Math.min(deposit.remaining, tripRemaining);
+        amountInput.value = suggested > 0 ? suggested.toFixed(2) : '';
+    } else {
+        remainingInput.value = '0.00';
+        amountInput.value = '';
+    }
+}
+
+async function unlinkDeposit(tripId, transactionId) {
+    if (!confirm('Are you sure you want to unlink this receipt? This will adjust the trip\'s deposited balance.')) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('transaction_id', transactionId);
+    
+    try {
+        const res = await fetch(`/api/trips/${tripId}/unlink-deposit`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (res.ok) {
+            // Reload page to reflect changes properly
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            alert('Failed to unlink: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error unlinking deposit');
+    }
+}
+
+async function submitLinkDeposit(e) {
+    e.preventDefault();
+    const txId = document.getElementById('available-deposits-select').value;
+    const amountToApply = parseFloat(document.getElementById('deposit-amount-input').value);
+    
+    if (!txId) {
+        alert('Please select an available deposit first.');
+        return;
+    }
+    
+    if (!amountToApply || amountToApply <= 0) {
+        alert('Please specify a valid positive amount to apply.');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('transaction_id', txId);
+    formData.append('amount_to_apply', amountToApply);
+    
+    try {
+        const res = await fetch(`/api/trips/${currentManageTripId}/link-deposit`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (res.ok) {
+            // Reload page to reflect changes properly
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            alert('Failed to link: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error linking deposit');
+    }
+}
+
+// Driver Document Management JS Logic [NEW]
+function onDocFileSelect(input) {
+    const label = document.getElementById('doc-file-label');
+    const meta = document.getElementById('doc-file-meta');
+    if (input.files && input.files.length > 0) {
+        const file = input.files[0];
+        label.textContent = file.name;
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        meta.textContent = `${sizeMb} MB | ${file.type || 'unknown type'}`;
+    } else {
+        label.textContent = 'Choose File...';
+        meta.textContent = 'Max size: 10MB';
+    }
+}
+
+async function submitDriverDocument(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-doc');
+    const fileInput = document.getElementById('doc-file-input');
+    const docType = document.getElementById('doc-type').value;
+    const notes = document.getElementById('doc-notes').value;
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a file to upload.');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    if (file.size > 10 * 1024 * 1024) {
+        alert('File size exceeds the 10MB limit.');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('document_type', docType);
+    formData.append('notes', notes);
+    formData.append('file', file);
+    
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.className = "w-full px-4 py-2.5 bg-gray-100 text-gray-400 text-xs font-bold uppercase rounded-xl cursor-not-allowed border border-gray-200/50 flex items-center justify-center gap-1.5";
+    btn.innerHTML = `<svg class="w-4 h-4 animate-spin text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Saving...`;
+    
+    try {
+        const res = await fetch(`/api/drivers/{{ driver.id }}/documents`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (res.ok) {
+            // Store active tab in localStorage so it reopens to documents tab
+            localStorage.setItem('active_driver_tab', 'documents');
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            alert('Upload failed: ' + (data.detail || 'Unknown error'));
+            btn.disabled = false;
+            btn.className = "w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all active:scale-95 duration-150 text-center flex items-center justify-center gap-1.5";
+            btn.innerHTML = originalText;
+        }
+    } catch (err) {
+        console.error(err);
+        alert('An error occurred during file upload.');
+        btn.disabled = false;
+        btn.className = "w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all active:scale-95 duration-150 text-center flex items-center justify-center gap-1.5";
+        btn.innerHTML = originalText;
+    }
+}
+
+async function deleteDriverDocument(docId) {
+    if (!confirm('Are you sure you want to permanently delete this document from the driver\'s portfolio? This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`/api/drivers/{{ driver.id }}/documents/${docId}`, {
+            method: 'DELETE'
+        });
+        
+        if (res.ok) {
+            localStorage.setItem('active_driver_tab', 'documents');
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            alert('Failed to delete document: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('An error occurred while deleting the document.');
+    }
+}
+
+function openDocumentPreview(filename, contentType, fileData) {
+    document.getElementById('preview-doc-title').textContent = filename;
+    const viewport = document.getElementById('preview-viewport-content');
+    viewport.innerHTML = '';
+    
+    if (contentType.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = fileData;
+        img.className = 'max-w-full max-h-[70vh] rounded-xl object-contain shadow-md border border-gray-150 bg-white';
+        viewport.appendChild(img);
+    } else if (contentType === 'application/pdf') {
+        const iframe = document.createElement('iframe');
+        iframe.src = fileData;
+        iframe.className = 'w-full h-[70vh] min-h-[500px] rounded-xl border border-gray-150 bg-white shadow-inner';
+        viewport.appendChild(iframe);
+    } else {
+        viewport.innerHTML = `
+            <div class="text-center p-8 space-y-4">
+                <div class="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                </div>
+                <div class="space-y-1">
+                    <h4 class="font-extrabold text-sm text-slate-700">Preview Not Available</h4>
+                    <p class="text-xs text-gray-500 font-medium">This document format (${contentType}) cannot be displayed directly in the browser previewer.</p>
+                </div>
+                <a href="${fileData}" download="${filename}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-xl transition-all shadow-md shadow-orange-500/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download to View
+                </a>
+            </div>
+        `;
+    }
+    
+    document.getElementById('documentPreviewModal').classList.remove('hidden');
+    document.getElementById('documentPreviewModal').classList.add('flex');
+}
+
+function closeDocumentPreview() {
+    document.getElementById('documentPreviewModal').classList.add('hidden');
+    document.getElementById('documentPreviewModal').classList.remove('flex');
+    document.getElementById('preview-viewport-content').innerHTML = '';
+}
+
+// Support auto-reopening to the documents tab if redirected after upload or delete
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTab = localStorage.getItem('active_driver_tab');
+    if (savedTab) {
+        localStorage.removeItem('active_driver_tab');
+        switchTab(savedTab);
+    }
+});
+</script>
+
 {% endblock %}

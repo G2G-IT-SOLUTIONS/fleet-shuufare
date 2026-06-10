@@ -1,89 +1,357 @@
 {% extends "base.html" %}
 
-{% block title %}Completed Orders | FLOS - Telebirr Verification{% endblock %}
+{% block title %}Orders | FLOS{% endblock %}
 
 {% block content %}
-<div class="mb-8 flex justify-between items-end">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-900">Completed Orders</h1>
-        <p class="text-gray-500 mt-1">Showing synced orders from your local database cache.</p>
-    </div>
-    <div class="flex items-center space-x-4">
-        <form action="/orders" method="GET" class="flex">
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </div>
-                <input type="text" name="search" value="{{ request.query_params.get('search', '') }}" placeholder="Search orders..." class="block w-64 pl-10 pr-3 py-1.5 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+<div class="w-full space-y-6">
+
+    <!-- Premium Control Panel Container -->
+    <div class="mb-8 bg-white border border-gray-150 rounded-2xl shadow-sm p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative">
+        <!-- Left Section: Title and Stats Badge -->
+        <div class="flex items-center gap-4">
+            <div>
+                <h1 class="text-xl font-black text-slate-800 tracking-tight">Completed Orders</h1>
+                <p class="text-[10px] font-bold text-gray-400 mt-0.5 leading-none">
+                    {% if total_count > 0 %}
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 font-extrabold text-[9px] mr-1">
+                            {{ total_count }} orders
+                        </span>
+                        retrieved for the last {{ days }} day{% if days > 1 %}s{% endif %}
+                    {% else %}
+                        No orders found for this period
+                    {% endif %}
+                </p>
             </div>
-        </form>
-        <span class="text-sm text-gray-500 italic">Syncing from Yango updates this cache</span>
-        <nav class="inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-            <a href="?page={{ page - 1 if page > 1 else 1 }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                <span class="sr-only">Previous</span>
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </div>
+
+        <!-- Middle/Right Section: Odoo Unified Search & Dropdown -->
+        <div class="flex-grow max-w-xl relative w-full lg:w-auto">
+            <form action="/orders" method="GET" id="orders-filter-form">
+                <!-- Hidden Fields for State -->
+                <input type="hidden" name="days" id="filter-days" value="{{ days }}">
+
+                <div class="relative flex items-center border border-gray-200 rounded-xl bg-gray-50/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all min-h-[38px] py-1 px-3">
+                    <span class="text-gray-400 mr-2.5 flex-shrink-0">
+                        <svg class="h-4.5 w-4.5 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </span>
+                    
+                    <!-- Active Filter Pills inside input -->
+                    <div class="flex flex-wrap items-center gap-1.5 max-w-[85%] flex-grow">
+                        <span class="inline-flex items-center gap-1 bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-orange-100 select-none">
+                            Period: {% if days == 1 %}Today{% else %}{{ days }} Days{% endif %}
+                        </span>
+
+                        {% if search %}
+                        <span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-[10px] font-bold px-2.5 py-0.5 rounded-lg border border-orange-100 select-none">
+                            Search: {{ search }}
+                            <button type="button" onclick="clearSearchOnly()" class="hover:text-red-500 font-extrabold ml-1 leading-none">&times;</button>
+                        </span>
+                        {% endif %}
+
+                        <input type="text" name="search" id="orders-search-input" value="{{ search or '' }}" placeholder="{% if not search %}Search Order ID, Short ID or driver...{% endif %}" class="bg-transparent border-none focus:ring-0 text-xs py-1 px-1 text-gray-700 placeholder-gray-400 font-semibold outline-none flex-grow min-w-[120px]">
+                    </div>
+
+                    <!-- Caret Button to Toggle Dropdown Menu -->
+                    <button type="button" id="dropdown-toggle-btn" class="ml-auto text-gray-400 hover:text-slate-600 focus:outline-none pl-2 border-l border-gray-200 h-5 flex items-center">
+                        <svg class="h-3.5 w-3.5 transition-transform duration-200" id="dropdown-caret" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Dropdown Menu Panel (Absolute Overlay) -->
+            <div id="odoo-dropdown-menu" class="hidden absolute top-full left-0 right-0 z-50 mt-2 bg-white border border-gray-100 shadow-2xl rounded-2xl p-5 flex flex-col sm:flex-row gap-6 text-sm divide-y sm:divide-y-0 sm:divide-x divide-gray-100 min-w-[290px] md:min-w-[500px]">
+                <!-- Column 1: Time Range Selection -->
+                <div class="flex-1 flex flex-col gap-3">
+                    <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                        <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        History Period
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        {% for d in [1, 3, 7, 14, 30] %}
+                        <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                            <input type="radio" name="days_radio" class="days-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="{{ d }}" {% if days == d %}checked{% endif %}>
+                            <span>{% if d == 1 %}Today (Last 24h){% elif d == 3 %}Last 3 Days{% elif d == 7 %}Last 7 Days{% elif d == 14 %}Last 14 Days{% else %}Last 30 Days{% endif %}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Column 2: Search Parameters info -->
+                <div class="flex-1 flex flex-col gap-3 sm:pl-4">
+                    <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                        <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Query Guidelines
+                    </div>
+                    <div class="text-[11px] text-gray-500 font-medium leading-relaxed">
+                        <p class="mb-1.5"><span class="font-bold text-slate-700">Yango ID Search</span> performs an operational lookup across all active records matching cached driver keys.</p>
+                        <p><span class="font-bold text-slate-700">Driver Matching</span> looks up cached internal drivers and retrieves relative completed order histories.</p>
+                    </div>
+                </div>
+
+                <!-- Column 3: Action controls -->
+                <div class="flex-1 flex flex-col gap-3 sm:pl-4">
+                    <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                        <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        Actions
+                    </div>
+                    <div class="flex flex-col gap-2.5">
+                        <button type="button" onclick="applyDropdownFilters()" class="w-full text-center text-xs text-white bg-slate-900 hover:bg-slate-800 px-3 py-2 rounded-xl transition-all font-bold active:scale-95 duration-150">
+                            Apply Filters
+                        </button>
+                        <button type="button" onclick="clearAllFilters()" class="flex items-center justify-between text-left text-xs text-rose-600 bg-rose-50/55 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all border border-rose-100 font-bold active:scale-95 duration-150">
+                            <span>Clear All</span>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-150 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1000px] divide-y divide-gray-100 text-sm">
+                <thead class="bg-gray-50/75 border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-3.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider w-12">#</th>
+                        <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date & Time</th>
+                        <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order Details</th>
+                        <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Driver</th>
+                        <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider w-24">Method</th>
+                        <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Price (ETB)</th>
+                        <th class="px-6 py-3.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider w-28">Status</th>
+                        <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pickup Address</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-50">
+                    {% for order in orders %}
+                    <tr class="hover:bg-orange-50/15 transition-all duration-150 border-b border-gray-50 last:border-0">
+                        <td class="px-6 py-4 whitespace-nowrap text-[10px] font-mono text-gray-400 text-center font-bold">
+                            {{ order['seq'] }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if order['ended_at'] %}
+                            <div class="text-sm font-semibold text-slate-800">{{ order['ended_at'].strftime('%Y-%m-%d') }}</div>
+                            <div class="text-[10px] text-gray-400 font-mono font-bold mt-0.5">{{ order['ended_at'].strftime('%H:%M') }}</div>
+                            {% else %}
+                            <span class="text-gray-300 italic text-xs">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-1.5 group">
+                                <span class="text-[10px] font-mono text-gray-400 font-semibold tracking-tight leading-none" title="{{ order['id'] }}">
+                                    {{ order['id'][:16] }}...
+                                </span>
+                                <button type="button" 
+                                        onclick="copyToClipboard('{{ order['id'] }}', this)" 
+                                        class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-orange-500 transition-all p-1 rounded-md hover:bg-gray-100 focus:opacity-100 focus:outline-none" 
+                                        title="Copy Full Order ID">
+                                    <svg class="w-3.5 h-3.5 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                                    </svg>
+                                    <svg class="w-3.5 h-3.5 check-icon hidden text-emerald-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="text-xs font-black text-orange-600 mt-1">#{{ order['short_id'] }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-3">
+                                {% if order['driver_id'] %}
+                                <a href="/drivers/{{ order['driver_id'] }}" class="h-8 w-8 rounded-full bg-orange-50 border border-orange-100/50 flex items-center justify-center font-extrabold text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-100/50 hover:border-orange-200/50 transition-all flex-shrink-0">
+                                    {{ (order['driver_name'] or '?')[0]|upper }}
+                                </a>
+                                {% else %}
+                                <div class="h-8 w-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center font-extrabold text-xs text-gray-500 uppercase flex-shrink-0">
+                                    {{ (order['driver_name'] or '?')[0]|upper }}
+                                </div>
+                                {% endif %}
+                                
+                                <div>
+                                    {% if order['driver_id'] %}
+                                    <a href="/drivers/{{ order['driver_id'] }}" class="text-sm font-bold text-slate-800 hover:text-orange-500 transition-colors">{{ order['driver_name'] }}</a>
+                                    {% else %}
+                                    <div class="text-sm font-bold text-slate-800">{{ order['driver_name'] }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if order['payment_method'] == 'cash' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-orange-50 text-orange-700 border border-orange-100/80 uppercase tracking-wider select-none leading-5">
+                                CASH
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100/80 uppercase tracking-wider select-none leading-5">
+                                {{ order['payment_method']|upper }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right font-extrabold text-slate-700 font-mono text-sm">
+                            {{ "{:,.2f}".format(order['price']) }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wider select-none leading-5">
+                                {{ order['status']|capitalize }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-xs text-gray-500 max-w-xs whitespace-nowrap">
+                            {% if order['address_from'] %}
+                                <span class="truncate block font-medium" title="{{ order['address_from'] }}">{{ order['address_from'] }}</span>
+                            {% else %}
+                                <span class="text-gray-300 italic">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-20 text-center">
+                            <div class="flex flex-col items-center">
+                                <div class="h-12 w-12 bg-gray-50 rounded-2xl border border-gray-150 flex items-center justify-center text-gray-400 mb-4 shadow-sm">
+                                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                </div>
+                                <p class="text-base font-bold text-gray-700">No completed orders found</p>
+                                <p class="text-xs text-gray-400 mt-1 max-w-sm">
+                                    {% if search %}No results for "{{ search }}". Try checking spelling or search with a different keyword.{% else %}There are no completed trips returned by Yango for the selected time range.{% endif %}
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Cursor-based Pagination -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Showing <span class="text-slate-800 font-extrabold">{{ total_count }}</span> orders on this page
+        </p>
+        <div class="flex items-center gap-2">
+            {% if cursor %}
+            <a href="/orders?days={{ days }}{% if search %}&search={{ search }}{% endif %}"
+               class="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-slate-800 hover:border-gray-300 transition-all shadow-sm select-none active:scale-95 duration-150 font-sans">
+                « First Page
             </a>
-            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                Page {{ page }}
-            </span>
-            <a href="?page={{ page + 1 }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                <span class="sr-only">Next</span>
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            {% else %}
+            <span class="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-gray-300 bg-gray-50 border border-gray-150 rounded-xl cursor-not-allowed select-none font-sans">« First Page</span>
+            {% endif %}
+
+            {% if next_cursor %}
+            <a href="/orders?cursor={{ next_cursor }}&days={{ days }}{% if search %}&search={{ search }}{% endif %}"
+               class="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-slate-800 hover:border-gray-300 transition-all shadow-sm select-none active:scale-95 duration-150 font-sans">
+                Next Page »
             </a>
-        </nav>
+            {% else %}
+            <span class="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-gray-300 bg-gray-50 border border-gray-150 rounded-xl cursor-not-allowed select-none font-sans">Next Page »</span>
+            {% endif %}
+        </div>
     </div>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Driver</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Method</th>
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Price (ETB)</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Completed At</th>
-                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for order in orders %}
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
-                        {{ order.id[:8] }}...
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">{{ order.driver_name }}</div>
-                        <div class="text-xs text-gray-500">{{ order.driver_id[:8] }}...</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
-                            {% if order.payment_method == 'cash' %}bg-orange-100 text-orange-800{% else %}bg-blue-100 text-blue-800{% endif %}">
-                            {{ order.payment_method|upper }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
-                        {{ "{:,.2f}".format(order.price) }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ order.ended_at.strftime('%Y-%m-%d %H:%M') }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-center">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            {{ order.status|capitalize }}
-                        </span>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" class="px-6 py-10 text-center text-gray-500">
-                        No cached orders found. Please run "Sync from Yango" on the dashboard.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+<script>
+// Copy to clipboard helper with checkmark toggle micro-animations
+function copyToClipboard(text, btn) {
+    if (!navigator.clipboard) {
+        // Fallback for environments lacking secure context or old browsers
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showCopyFeedback(btn);
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+        }
+        document.body.removeChild(textArea);
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        showCopyFeedback(btn);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
+
+function showCopyFeedback(btn) {
+    const copyIcon = btn.querySelector('.copy-icon');
+    const checkIcon = btn.querySelector('.check-icon');
+    
+    copyIcon.classList.add('hidden');
+    checkIcon.classList.remove('hidden');
+    btn.classList.add('bg-emerald-50');
+    
+    setTimeout(() => {
+        copyIcon.classList.remove('hidden');
+        checkIcon.classList.add('hidden');
+        btn.classList.remove('bg-emerald-50');
+    }, 2000);
+}
+
+// Toggle caret dropdown menu display states
+const toggleBtn = document.getElementById('dropdown-toggle-btn');
+const dropdownMenu = document.getElementById('odoo-dropdown-menu');
+const dropdownCaret = document.getElementById('dropdown-caret');
+const searchInput = document.getElementById('orders-search-input');
+
+function toggleDropdown() {
+    dropdownMenu.classList.toggle('hidden');
+    dropdownCaret.classList.toggle('rotate-180');
+}
+
+toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDropdown();
+});
+
+// Close dropdown if clicked outside
+document.addEventListener('click', (e) => {
+    if (!dropdownMenu.contains(e.target) && !toggleBtn.contains(e.target)) {
+        dropdownMenu.classList.add('hidden');
+        dropdownCaret.classList.remove('rotate-180');
+    }
+});
+
+// Trigger form submit when user hits enter in main search box
+searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('orders-filter-form').submit();
+    }
+});
+
+// Apply selections made inside dropdown
+function applyDropdownFilters() {
+    const selectedDaysRadio = document.querySelector('input[name="days_radio"]:checked');
+    if (selectedDaysRadio) {
+        document.getElementById('filter-days').value = selectedDaysRadio.value;
+    }
+    document.getElementById('orders-filter-form').submit();
+}
+
+// Clear only the search criteria
+function clearSearchOnly() {
+    document.getElementById('orders-search-input').value = '';
+    document.getElementById('orders-filter-form').submit();
+}
+
+// Clear all active filters and reset period to default (1 day)
+function clearAllFilters() {
+    document.getElementById('orders-search-input').value = '';
+    document.getElementById('filter-days').value = '1';
+    
+    const defaultRadio = document.querySelector('input[name="days_radio"][value="1"]');
+    if (defaultRadio) {
+        defaultRadio.checked = true;
+    }
+    
+    document.getElementById('orders-filter-form').submit();
+}
+</script>
 {% endblock %}

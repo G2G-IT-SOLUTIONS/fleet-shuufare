@@ -1,577 +1,75 @@
-from fastapi import FastAPI, Depends, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from sqlmodel import Session, select
-from typing import List
-from datetime import date, datetime, timezone
-import uuid
+from sqlmodel import select
 
 from app.database import create_db_and_tables, get_session
-from app.models import Driver, ExpectedRevenue, TelebirrTransaction, ReconciliationRecord, Order, User
-from app.services.yango import YangoClient
+from app.models import User, SystemConfig
+from app.core.dependencies import pwd_context
 
-from passlib.context import CryptContext
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-from fastapi.responses import RedirectResponse
-from fastapi import Cookie, Response
+# Import routers
+from app.routers import auth, views, api_drivers, api_yango, api_users, api_sync, api_system
 
 app = FastAPI(title="FLOS - Telebirr Integration Simulator")
-yango_client = YangoClient()
 
-# Setting up Jinja2 templates
+# Static files not currently used in this project
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
     # Create default admin if not exists
     with next(get_session()) as db:
-        admin = db.exec(select(User).where(User.username == "admin")).first()
+        admin = db.exec(select(User).where(User.email == "admin@shuufare.com")).first()
         if not admin:
             hashed_pwd = pwd_context.hash("admin123")
-            admin = User(username="admin", hashed_password=hashed_pwd, full_name="System Admin", role="admin")
+            admin = User(email="admin@shuufare.com", hashed_password=hashed_pwd, full_name="System Admin", role="admin")
             db.add(admin)
-            db.commit()
-
-# ==========================================
-# AUTHENTICATION HELPERS
-# ==========================================
-
-async def get_current_user(db: Session = Depends(get_session), session_id: str = Cookie(None)):
-    if not session_id:
-        return None
-    user = db.exec(select(User).where(User.username == session_id)).first() # Simple session for now
-    return user
-
-# ==========================================
-# FRONTEND VIEWS
-# ==========================================
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse(request=request, name="login.html")
-
-@app.post("/login")
-async def login_submit(
-    response: Response,
-    username: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_session)
-):
-    user = db.exec(select(User).where(User.username == username)).first()
-    if not user or not pwd_context.verify(password, user.hashed_password):
-        return RedirectResponse(url="/login?error=Invalid credentials", status_code=303)
-    
-    # Set simple cookie session
-    response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie(key="session_id", value=user.username, httponly=True)
-    return response
-
-@app.get("/logout")
-async def logout(response: Response):
-    response = RedirectResponse(url="/login", status_code=303)
-    response.delete_cookie("session_id")
-    return response
-
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, search: str = None, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
-    """Main operations dashboard."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    # Fetch drivers and their latest reconciliation record
-    statement = select(Driver)
-    if search:
-        statement = statement.where(
-            (Driver.name.ilike(f"%{search}%")) | 
-            (Driver.operator_id.ilike(f"%{search}%")) |
-            (Driver.phone.ilike(f"%{search}%"))
-        )
-    drivers = db.exec(statement).all()
-    
-    # We will compute reconciliation on the fly for today for simplicity, 
-    # or just show the records. Let's show today's expected vs actual.
-    today = date.today()
-    dashboard_data = []
-    
-    for d in drivers:
-        expected = db.exec(
-            select(ExpectedRevenue).where(ExpectedRevenue.driver_id == d.id, ExpectedRevenue.date == today)
-        ).first()
-        
-        actual_txs = db.exec(
-            select(TelebirrTransaction).where(TelebirrTransaction.driver_id == d.id)
-        ).all()
-        # Filter for today
-        actual_today = sum([tx.amount for tx in actual_txs if tx.timestamp.date() == today])
-        
-        expected_amt = expected.expected_amount if expected else 0.0
-        
-        # Calculate status manually for dashboard view
-        if expected_amt == 0 and actual_today == 0:
-            status = "No Activity"
-            color = "gray"
-        elif actual_today == expected_amt:
-            status = "Verified"
-            color = "green"
-        elif actual_today == 0:
-            status = "Missing Deposit"
-            color = "red"
-        elif actual_today < expected_amt:
-            status = "Partial Deposit"
-            color = "orange"
-        else:
-            status = "Excess Deposit"
-            color = "blue"
             
-        dashboard_data.append({
-            "driver": d,
-            "expected": expected_amt,
-            "actual": actual_today,
-            "status": status,
-            "color": color
-        })
+        # Seed default configs
+        default_configs = [
+            {"key": "DRIVER_SYNC_LOOKBACK_DAYS", "value": "7", "description": "Delta sync lookback window for driver profiles", "data_type": "int"},
+            {"key": "LATEST_ORDERS_SYNC_DAYS", "value": "1", "description": "Lookback window for syncing orders for a specific driver", "data_type": "int"},
+            {"key": "DEEP_SCAN_MAX_DAYS", "value": "365", "description": "Maximum search timeframe for Deep Scan orders lookup", "data_type": "int"},
+            {"key": "AUTO_SYNC_ENABLED", "value": "true", "description": "Enable automated background order syncing", "data_type": "string"},
+            {"key": "AUTO_SYNC_INTERVAL_HOURS", "value": "6", "description": "Interval in hours between automated background runs", "data_type": "int"},
+            {"key": "RECONCILE_ENFORCE_TIME_SEQUENCE", "value": "true", "description": "If enabled, automatic reconciliation will only match Telebirr deposits with trips completed before the deposit timestamp", "data_type": "string"},
+            {"key": "SMS_GATEWAY_PHONE_FORMAT", "value": "canonical", "description": "Phone number format expected by the SMS gateway ('canonical' for +251..., 'international_no_plus' for 251..., 'local_with_zero' for 09..., 'raw_9_digits' for 9...)", "data_type": "string"},
+            {"key": "SHIFT_DAY_START", "value": "06:00", "description": "Start time for the Day Shift (Format HH:MM)", "data_type": "string"},
+            {"key": "SHIFT_DAY_END", "value": "18:00", "description": "End time for the Day Shift (Format HH:MM)", "data_type": "string"},
+            {"key": "SHIFT_NIGHT_START", "value": "18:00", "description": "Start time for the Night Shift (Format HH:MM)", "data_type": "string"},
+            {"key": "SHIFT_NIGHT_END", "value": "06:00", "description": "End time for the Night Shift (Format HH:MM)", "data_type": "string"}
+        ]
         
-    # KPI Calculations
-    total_expected = sum(item["expected"] for item in dashboard_data)
-    total_actual = sum(item["actual"] for item in dashboard_data)
-    total_drivers = len(dashboard_data)
-    reconciled_drivers = sum(1 for item in dashboard_data if item["status"] == "Verified")
-    exceptions_count = sum(1 for item in dashboard_data if item["status"] in ["Missing Deposit", "Partial Deposit", "Excess Deposit"])
-    reconciliation_rate = (reconciled_drivers / total_drivers * 100) if total_drivers > 0 else 0
-    
-    kpis = {
-        "total_expected": total_expected,
-        "total_actual": total_actual,
-        "total_drivers": total_drivers,
-        "reconciled_drivers": reconciled_drivers,
-        "exceptions_count": exceptions_count,
-        "reconciliation_rate": reconciliation_rate,
-        "unreconciled_drivers": total_drivers - reconciled_drivers
-    }
-        
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html", 
-        context={
-            "data": dashboard_data,
-            "today": today,
-            "kpis": kpis
-        }
-    )
-
-@app.get("/simulator", response_class=HTMLResponse)
-async def simulator_view(request: Request, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
-    """UI to mock a deposit."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    drivers = db.exec(select(Driver)).all()
-    return templates.TemplateResponse(
-        request=request,
-        name="simulator.html", 
-        context={
-            "drivers": drivers
-        }
-    )
-
-@app.get("/exceptions", response_class=HTMLResponse)
-async def exceptions_view(request: Request, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
-    """View only drivers with reconciliation discrepancies and summary stats."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    drivers = db.exec(select(Driver)).all()
-    today = date.today()
-    exceptions_data = []
-    
-    total_reconciled_val = 0
-    total_unreconciled_val = 0
-    missing_count = 0
-    partial_count = 0
-    excess_count = 0
-    
-    for d in drivers:
-        expected = db.exec(
-            select(ExpectedRevenue).where(ExpectedRevenue.driver_id == d.id, ExpectedRevenue.date == today)
-        ).first()
-        
-        actual_txs = db.exec(
-            select(TelebirrTransaction).where(TelebirrTransaction.driver_id == d.id)
-        ).all()
-        actual_today = sum([tx.amount for tx in actual_txs if tx.timestamp.date() == today])
-        
-        expected_amt = expected.expected_amount if expected else 0.0
-        
-        if expected_amt == 0 and actual_today == 0:
-            continue 
-        
-        if actual_today != expected_amt:
-            if actual_today == 0:
-                status, color = "Missing Deposit", "red"
-                missing_count += 1
-            elif actual_today < expected_amt:
-                status, color = "Partial Deposit", "orange"
-                partial_count += 1
-            else:
-                status, color = "Excess Deposit", "blue"
-                excess_count += 1
-            
-            total_unreconciled_val += (expected_amt - actual_today)
-                
-            exceptions_data.append({
-                "driver": d,
-                "expected": expected_amt,
-                "actual": actual_today,
-                "status": status,
-                "color": color
-            })
-        else:
-            total_reconciled_val += actual_today
-            
-    reconciliation_rate = (total_reconciled_val / (total_reconciled_val + abs(total_unreconciled_val)) * 100) if (total_reconciled_val + abs(total_unreconciled_val)) > 0 else 100
-            
-    return templates.TemplateResponse(
-        request=request,
-        name="exceptions.html", 
-        context={
-            "data": exceptions_data,
-            "today": today,
-            "kpis": {
-                "missing_count": missing_count,
-                "partial_count": partial_count,
-                "excess_count": excess_count,
-                "total_drivers": len(drivers),
-                "reconciliation_rate": reconciliation_rate
-            }
-        }
-    )
-
-@app.get("/orders", response_class=HTMLResponse)
-async def orders_view(request: Request, search: str = None, db: Session = Depends(get_session), page: int = 1, user: User = Depends(get_current_user)):
-    """View completed orders cached in the database with search."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    limit = 50
-    offset = (page - 1) * limit
-    
-    statement = select(Order).order_by(Order.ended_at.desc())
-    if search:
-        statement = statement.where(
-            (Order.driver_name.ilike(f"%{search}%")) | 
-            (Order.driver_id.ilike(f"%{search}%")) |
-            (Order.id.ilike(f"%{search}%"))
-        )
-        
-    orders = db.exec(statement.offset(offset).limit(limit)).all()
-    
-    return templates.TemplateResponse(
-        request=request,
-        name="orders.html",
-        context={
-            "orders": orders,
-            "page": page
-        }
-    )
-
-@app.get("/internal-drivers", response_class=HTMLResponse)
-async def internal_drivers_view(request: Request, search: str = None, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
-    """View dedicated only to internal drivers."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    statement = select(Driver).where(Driver.driver_type == "internal")
-    if search:
-        statement = statement.where(
-            (Driver.name.ilike(f"%{search}%")) | 
-            (Driver.operator_id.ilike(f"%{search}%")) |
-            (Driver.phone.ilike(f"%{search}%"))
-        )
-    drivers = db.exec(statement).all()
-    
-    return templates.TemplateResponse(
-        request=request,
-        name="internal_drivers.html",
-        context={"drivers": drivers}
-    )
-
-@app.get("/drivers/{driver_id}", response_class=HTMLResponse)
-async def driver_detail_view(request: Request, driver_id: int, db: Session = Depends(get_session), user: User = Depends(get_current_user)):
-    """Deep dive into a specific driver's performance and reconciliation."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-    driver = db.get(Driver, driver_id)
-    if not driver:
-        raise HTTPException(status_code=404, detail="Driver not found")
-        
-    # Get all transactions
-    transactions = db.exec(
-        select(TelebirrTransaction).where(TelebirrTransaction.driver_id == driver.id).order_by(TelebirrTransaction.timestamp.desc())
-    ).all()
-    
-    # Get all reconciliation records
-    reconciliations = db.exec(
-        select(ReconciliationRecord).where(ReconciliationRecord.driver_id == driver.id).order_by(ReconciliationRecord.date.desc())
-    ).all()
-    
-    # Calculate KPIs
-    total_expected = sum([r.expected_amount for r in reconciliations])
-    total_actual = sum([r.actual_amount for r in reconciliations])
-    variance = total_expected - total_actual
-    compliance = (total_actual / total_expected * 100) if total_expected > 0 else 100
-    
-    # Get today's expected revenue
-    today_expected = db.exec(
-        select(ExpectedRevenue).where(ExpectedRevenue.driver_id == driver.id, ExpectedRevenue.date == date.today())
-    ).first()
-    
-    return templates.TemplateResponse(
-        request=request,
-        name="driver_detail.html",
-        context={
-            "driver": driver,
-            "transactions": transactions,
-            "reconciliations": reconciliations,
-            "kpis": {
-                "total_expected": total_expected,
-                "total_actual": total_actual,
-                "variance": variance,
-                "compliance": compliance,
-                "today_expected": today_expected.expected_amount if today_expected else 0.0
-            }
-        }
-    )
-
-# ==========================================
-# API ENDPOINTS
-# ==========================================
-
-from pydantic import BaseModel
-
-class WebhookPayload(BaseModel):
-    transaction_id: str
-    amount: float
-    sender_identifier: str
-    merchant_id: str
-    timestamp: datetime
-    status: str
-
-@app.post("/api/telebirr/webhook")
-async def telebirr_webhook(payload: WebhookPayload, db: Session = Depends(get_session)):
-    """Simulates receiving a webhook from Telebirr when a driver deposits."""
-    # 1. Store transaction
-    tx = TelebirrTransaction(
-        transaction_id=payload.transaction_id,
-        amount=payload.amount,
-        sender_identifier=payload.sender_identifier,
-        merchant_id=payload.merchant_id,
-        timestamp=payload.timestamp,
-        status=payload.status
-    )
-    
-    # 2. Attribution: Try to find driver by operator ID or phone
-    driver = db.exec(
-        select(Driver).where(
-            (Driver.operator_id == payload.sender_identifier) | 
-            (Driver.phone == payload.sender_identifier)
-        )
-    ).first()
-    
-    if driver:
-        tx.driver_id = driver.id
-        
-    db.add(tx)
-    db.commit()
-    db.refresh(tx)
-    
-    return {"message": "Transaction recorded and attributed", "transaction": tx}
-
-
-@app.post("/api/simulator/deposit")
-async def simulate_deposit(
-    driver_id: int = Form(...),
-    amount: float = Form(...),
-    db: Session = Depends(get_session)
-):
-    """Called from our simulator UI to trigger the webhook logic."""
-    driver = db.get(Driver, driver_id)
-    if not driver:
-        return {"error": "Driver not found"}
-        
-    # Create fake webhook payload
-    payload = WebhookPayload(
-        transaction_id=f"TB-{uuid.uuid4().hex[:8].upper()}",
-        amount=amount,
-        sender_identifier=driver.operator_id,
-        merchant_id="G2G-MERCHANT-001",
-        timestamp=datetime.utcnow(),
-        status="success"
-    )
-    
-    # Call the webhook function directly for simulation
-    await telebirr_webhook(payload, db)
-    
-    # Redirect back to simulator with success
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/simulator?success=true", status_code=303)
-
-@app.post("/api/sync/yango")
-async def sync_yango_data(db: Session = Depends(get_session)):
-    """Sync drivers and calculate expected revenue from Yango orders."""
-    try:
-        # 1. Sync Drivers
-        yango_drivers = await yango_client.get_drivers()
-        batch_size = 500
-        for i in range(0, len(yango_drivers), batch_size):
-            batch = yango_drivers[i:i + batch_size]
-            for yd in batch:
-                profile = yd.get("driver_profile", {})
-                y_id = profile.get("id")
-                name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip() or "Unknown"
-                phones = profile.get("phones", [])
-                phone = phones[0] if phones else None
-                
-                # Check if exists
-                driver = db.exec(select(Driver).where(Driver.operator_id == y_id)).first()
-                if not driver:
-                    driver = Driver(operator_id=y_id, name=name, phone=phone)
-                    db.add(driver)
-                else:
-                    driver.name = name
-                    driver.phone = phone
-            db.commit()
-
-        # 2. Sync Orders for Today to calculate ExpectedRevenue
-        today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
-        today_end = datetime.combine(date.today(), datetime.max.time()).replace(tzinfo=timezone.utc)
-        
-        yango_orders = await yango_client.get_all_completed_orders(date_from=today_start, date_to=today_end)
-        
-        # 3. Cache Orders in DB
-        for o in yango_orders:
-            o_id = o.get("id")
-            profile = o.get("driver_profile", {})
-            d_id = profile.get("id")
-            
-            # Convert Yango timestamp
-            ended_at_str = o.get("ended_at", "")
-            try:
-                # Yango uses 2019-08-08T11:58:01+03:00 format
-                ended_at = datetime.fromisoformat(ended_at_str)
-            except:
-                ended_at = datetime.utcnow()
-                
-            # Upsert Order
-            db_order = db.get(Order, o_id)
-            if not db_order:
-                db_order = Order(
-                    id=o_id,
-                    short_id=o.get("short_id", 0),
-                    status=o.get("status", ""),
-                    price=float(o.get("price", 0)),
-                    payment_method=o.get("payment_method", ""),
-                    driver_id=d_id,
-                    driver_name=profile.get("name", "Unknown"),
-                    ended_at=ended_at
-                )
-                db.add(db_order)
-            else:
-                db_order.status = o.get("status", "")
-                db_order.price = float(o.get("price", 0))
-
-        # Calculate sums per driver for ExpectedRevenue
-        revenue_map = {}
-        for o in yango_orders:
-            d_id = o.get("driver_profile", {}).get("id")
-            if not d_id: continue
-            
-            if o.get("payment_method") != "cash":
-                continue
-                
-            price = float(o.get("price", 0))
-            revenue_map[d_id] = revenue_map.get(d_id, 0) + price
-            
-        # Update ExpectedRevenue table
-        for y_id, amount in revenue_map.items():
-            driver = db.exec(select(Driver).where(Driver.operator_id == y_id)).first()
-            if not driver: continue
-            
-            exp_rev = db.exec(select(ExpectedRevenue).where(
-                ExpectedRevenue.driver_id == driver.id, 
-                ExpectedRevenue.date == date.today()
-            )).first()
-            
-            if not exp_rev:
-                exp_rev = ExpectedRevenue(driver_id=driver.id, date=date.today(), expected_amount=amount)
-                db.add(exp_rev)
-            else:
-                exp_rev.expected_amount = amount
+        for conf in default_configs:
+            if not db.get(SystemConfig, conf["key"]):
+                db.add(SystemConfig(**conf))
                 
         db.commit()
-        return {"message": "Sync completed", "drivers_synced": len(yango_drivers), "orders_processed": len(yango_orders)}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/drivers/update-type")
-async def update_driver_type(
-    driver_id: int = Form(...),
-    driver_type: str = Form(...),
-    db: Session = Depends(get_session)
-):
-    """Update a driver's type (internal/external)."""
-    driver = db.get(Driver, driver_id)
-    if not driver:
-        raise HTTPException(status_code=404, detail="Driver not found")
-        
-    driver.driver_type = driver_type
-    db.add(driver)
-    db.commit()
-    return {"message": f"Driver {driver.name} updated to {driver_type}"}
+    # Start automated background synchronization scheduler
+    try:
+        from app.services.scheduler import scheduler, check_and_run_scheduled_sync
+        scheduler.add_job(check_and_run_scheduled_sync, "interval", minutes=15, id="scheduled_sync_check")
+        scheduler.start()
+        print("[Startup] Background synchronization scheduler started successfully.")
+    except Exception as sched_err:
+        print(f"[Startup] Error starting scheduler: {sched_err}")
 
-@app.post("/api/reconciliation/run")
-async def run_reconciliation(target_date: date = None, db: Session = Depends(get_session)):
-    """Batch job to reconcile expected vs actual for a given day."""
-    if not target_date:
-        target_date = date.today()
-        
-    drivers = db.exec(select(Driver)).all()
-    results = []
-    
-    for d in drivers:
-        expected = db.exec(
-            select(ExpectedRevenue).where(ExpectedRevenue.driver_id == d.id, ExpectedRevenue.date == target_date)
-        ).first()
-        
-        expected_amt = expected.expected_amount if expected else 0.0
-        
-        actual_txs = db.exec(
-            select(TelebirrTransaction).where(TelebirrTransaction.driver_id == d.id)
-        ).all()
-        actual_amt = sum([tx.amount for tx in actual_txs if tx.timestamp.date() == target_date])
-        
-        if expected_amt == 0 and actual_amt == 0:
-            continue # No activity to reconcile
-            
-        if actual_amt == expected_amt:
-            status = "Verified"
-        elif actual_amt == 0:
-            status = "Missing Deposit"
-        elif actual_amt < expected_amt:
-            status = "Partial Deposit"
-        else:
-            status = "Excess Deposit"
-            
-        record = ReconciliationRecord(
-            driver_id=d.id,
-            date=target_date,
-            expected_amount=expected_amt,
-            actual_amount=actual_amt,
-            status=status
-        )
-        db.add(record)
-        results.append(record)
-        
-    db.commit()
-    return {"message": f"Reconciliation ran for {target_date}", "records_processed": len(results)}
+@app.on_event("shutdown")
+def on_shutdown():
+    try:
+        from app.services.scheduler import scheduler
+        scheduler.shutdown()
+        print("[Shutdown] Background scheduler shut down cleanly.")
+    except Exception as shutdown_err:
+        print(f"[Shutdown] Error during background scheduler shutdown: {shutdown_err}")
+
+# Register Routers
+app.include_router(auth.router, tags=["Authentication"])
+app.include_router(views.router, tags=["Frontend Views"])
+app.include_router(api_drivers.router, prefix="/api/drivers", tags=["Drivers API"])
+app.include_router(api_yango.router, prefix="/api/yango", tags=["Yango API"])
+app.include_router(api_users.router, prefix="/api/users", tags=["Users API"])
+app.include_router(api_sync.router, prefix="/api", tags=["Sync & Reconciliation API"]) # handles /api/sync/* and /api/reconciliation/* and /api/telebirr/*
+app.include_router(api_system.router, prefix="/api", tags=["System API"]) # handles /api/notifications/* and /api/configs/* and /api/me

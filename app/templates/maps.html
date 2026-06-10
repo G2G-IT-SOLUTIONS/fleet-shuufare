@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}Live Map | FLOS{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet.js CSS from CDN -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<style>
+  /* Custom styled scrollbars for the sidebar list */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Custom styling for Leaflet elements to match the premium theme */
+  .leaflet-bar {
+    border: none !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  }
+  .leaflet-bar a {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(8px);
+    border: 1px solid #f1f5f9 !important;
+    color: #1e293b !important;
+    transition: all 0.2s ease-in-out;
+  }
+  .leaflet-bar a:first-child {
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+  }
+  .leaflet-bar a:last-child {
+    border-bottom-left-radius: 12px !important;
+    border-bottom-right-radius: 12px !important;
+  }
+  .leaflet-bar a:hover {
+    background-color: #f97316 !important;
+    color: #ffffff !important;
+  }
+  
+  /* Custom Leaflet popup design */
+  .leaflet-popup-content-wrapper {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(249, 115, 22, 0.15);
+    border-radius: 16px !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    padding: 2px !important;
+    font-family: 'Outfit', sans-serif !important;
+  }
+  .leaflet-popup-tip {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(12px);
+    border-left: 1px solid rgba(249, 115, 22, 0.15);
+    border-bottom: 1px solid rgba(249, 115, 22, 0.15);
+  }
+  .leaflet-popup-content {
+    margin: 8px 12px !important;
+    line-height: inherit !important;
+  }
+
+  /* Micro-animations and pulse effects */
+  @keyframes pulse-ring {
+    0% { transform: scale(0.65); opacity: 0; }
+    50% { opacity: 0.45; }
+    100% { transform: scale(1.35); opacity: 0; }
+  }
+  .animate-pulse-ring {
+    animation: pulse-ring 2.2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+  }
+  
+  .driver-card-active {
+    background-color: #fff7ed !important;
+    border-color: #ffedd5 !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-[calc(100vh-6rem)] md:h-[calc(100vh-5rem)]">
+  <!-- Page Header -->
+  <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-black text-slate-800 tracking-tight">Real-Time Fleet Map</h1>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Live Driver Geolocation & Shifts</p>
+    </div>
+    <div class="flex items-center gap-2 text-xs font-bold text-slate-500 bg-white border border-gray-150 rounded-xl px-3.5 py-2 shadow-sm">
+      <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span id="active-count-badge">Loading tracking...</span>
+    </div>
+  </div>
+
+  <!-- Content Workspace split-screen panel -->
+  <div class="flex-1 flex flex-col lg:flex-row gap-5 min-h-0 overflow-hidden mb-4">
+    
+    <!-- Left Column: Search & Driver Directory -->
+    <div class="w-full lg:w-96 flex flex-col bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden flex-shrink-0">
+      <!-- Search Input Container -->
+      <div class="p-4 border-b border-gray-100 bg-gray-50/50">
+        <div class="relative flex items-center border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all py-1.5 px-3">
+          <span class="text-gray-400 mr-2 flex-shrink-0">
+            <svg class="h-4.5 w-4.5 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </span>
+          <input type="text" id="driver-search-box" placeholder="Search live drivers..." class="w-full bg-transparent border-none text-sm font-semibold text-gray-800 placeholder-gray-400 focus:outline-none p-0 focus:ring-0" />
+        </div>
+      </div>
+
+      <!-- Directory List -->
+      <div id="driver-directory" class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+        {% if drivers %}
+          {% for driver in drivers %}
+            <div id="driver-card-{{ driver.id }}" onclick="focusDriver({{ driver.id }})" class="driver-list-card flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-orange-100 hover:bg-orange-50/20 cursor-pointer transition-all duration-200 group transform active:scale-[0.99]" data-driver-name="{{ driver.name.lower() }}">
+              <div class="flex items-center gap-3 min-w-0">
+                <!-- Customized Initials Avatar -->
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-500 text-white flex items-center justify-center font-black text-sm shadow-sm group-hover:scale-105 transition-transform duration-200 flex-shrink-0">
+                  {{ driver.name[0]|upper }}
+                </div>
+                <!-- Driver Meta -->
+                <div class="min-w-0">
+                  <h3 class="text-sm font-bold text-gray-800 group-hover:text-orange-700 transition-colors duration-150 truncate">{{ driver.name }}</h3>
+                  <p class="text-xs text-slate-400 font-semibold truncate">{{ driver.phone or "No phone" }}</p>
+                </div>
+              </div>
+
+              <!-- Badges column -->
+              <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                <!-- Shift Badge -->
+                {% if driver.shift == 'Day' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[0.6rem] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Day</span>
+                {% elif driver.shift == 'Night' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[0.6rem] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">Night</span>
+                {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[0.6rem] font-bold uppercase tracking-wider bg-slate-50 text-slate-500 border border-slate-200">None</span>
+                {% endif %}
+
+                <!-- Tracker Status Badge -->
+                <span class="inline-flex items-center gap-1 text-[0.6rem] font-bold text-emerald-600 uppercase tracking-widest">
+                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Active
+                </span>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="h-full flex flex-col items-center justify-center text-center p-6">
+            <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+              </svg>
+            </div>
+            <h4 class="text-sm font-bold text-gray-700">No Managed Drivers</h4>
+            <p class="text-xs text-gray-400 mt-1">Add drivers in the directory first.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right Column: Premium Leaflet Map Canvas -->
+    <div class="flex-1 bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden relative">
+      <div id="map" class="w-full h-full"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Center coordinates over Addis Ababa, Ethiopia
+  const ADDIS_ABABA_LAT = 9.0192;
+  const ADDIS_ABABA_LNG = 38.7468;
+  
+  // Initialize map with custom Zoom and drag mechanics
+  const map = L.map('map', {
+    zoomControl: true,
+    attributionControl: false
+  }).setView([ADDIS_ABABA_LAT, ADDIS_ABABA_LNG], 13);
+
+  // Modern crisp styled Mapbox tile layout (Sleek light design style)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20
+  }).addTo(map);
+
+  // Keep a clean in-memory registry of driver locations and map markers
+  const driverMarkers = {};
+  const driverDataRegistry = [];
+
+  // Deterministic latitude/longitude offsets based on driver ID to keep positions persistent
+  function getDriverCoords(id) {
+    const latSin = Math.sin(id * 12.9898) * 43758.5453;
+    const lngSin = Math.sin(id * 78.233) * 43758.5453;
+    const latOffset = (latSin - Math.floor(latSin)) * 0.04 - 0.02;
+    const lngOffset = (lngSin - Math.floor(lngSin)) * 0.04 - 0.02;
+    return [ADDIS_ABABA_LAT + latOffset, ADDIS_ABABA_LNG + lngOffset];
+  }
+
+  // Populate data using jinja parsed dictionary
+  {% for driver in drivers %}
+    (function() {
+      const driverId = {{ driver.id }};
+      const driverName = "{{ driver.name }}";
+      const driverPhone = "{{ driver.phone or 'N/A' }}";
+      const driverShift = "{{ driver.shift or 'None' }}";
+      const coords = getDriverCoords(driverId);
+      
+      driverDataRegistry.push({
+        id: driverId,
+        name: driverName,
+        phone: driverPhone,
+        shift: driverShift,
+        coords: coords
+      });
+    })();
+  {% endfor %}
+
+  // Render drivers beautifully on map
+  driverDataRegistry.forEach(function(driver) {
+    const initials = driver.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    
+    // Create custom pulsing map marker icon
+    const markerIcon = L.divIcon({
+      className: 'custom-leaflet-marker',
+      html: `
+        <div class="relative flex items-center justify-center" style="width: 44px; height: 44px;">
+          <!-- Custom outer pulsing radar effect -->
+          <div class="absolute w-10 h-10 rounded-full bg-orange-500 animate-pulse-ring"></div>
+          
+          <!-- Modern floating pin bubble -->
+          <div class="relative w-8 h-8 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white flex items-center justify-center font-black text-xs shadow-md border-2 border-white hover:scale-110 active:scale-95 transition-all cursor-pointer">
+            ${initials}
+          </div>
+        </div>
+      `,
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+      popupAnchor: [0, -12]
+    });
+
+    // Premium popup layout matching our UI cards
+    const popupContent = `
+      <div class="flex flex-col gap-2 min-w-[200px] select-none p-1">
+        <div class="flex items-center gap-2.5">
+          <div class="h-9 w-9 rounded-xl bg-orange-500 text-white flex items-center justify-center font-black text-xs shadow-sm">
+            ${initials}
+          </div>
+          <div class="min-w-0">
+            <h4 class="text-sm font-bold text-gray-800 truncate">${driver.name}</h4>
+            <p class="text-[0.65rem] font-bold text-orange-500 uppercase tracking-wide">Internal Driver</p>
+          </div>
+        </div>
+        
+        <div class="border-t border-gray-100 my-1"></div>
+        
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-[0.7rem] font-semibold text-slate-500">
+            <span>Phone:</span>
+            <span class="text-gray-700">${driver.phone}</span>
+          </div>
+          <div class="flex items-center justify-between text-[0.7rem] font-semibold text-slate-500">
+            <span>Shift:</span>
+            <span class="text-gray-700">${driver.shift}</span>
+          </div>
+          <div class="flex items-center justify-between text-[0.7rem] font-semibold text-slate-500">
+            <span>Status:</span>
+            <span class="flex items-center gap-1 font-bold text-emerald-600 uppercase tracking-widest text-[0.65rem]">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Active
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Initialize marker and append to map
+    const marker = L.marker(driver.coords, { icon: markerIcon }).addTo(map);
+    marker.bindPopup(popupContent);
+    
+    // Bind marker click back to our listing cards
+    marker.on('click', function() {
+      highlightSidebarCard(driver.id);
+    });
+
+    driverMarkers[driver.id] = marker;
+  });
+
+  // Highlight active driver card in the sidebar directory
+  function highlightSidebarCard(driverId) {
+    // Reset all cards first
+    document.querySelectorAll('.driver-list-card').forEach(function(card) {
+      card.classList.remove('driver-card-active');
+    });
+
+    const activeCard = document.getElementById('driver-card-' + driverId);
+    if (activeCard) {
+      activeCard.classList.add('driver-card-active');
+      activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  // Handle focusing from directory click
+  function focusDriver(driverId) {
+    const driver = driverDataRegistry.find(d => d.id === driverId);
+    if (driver && driverMarkers[driverId]) {
+      highlightSidebarCard(driverId);
+      
+      // Pan map smoothly to correct driver geocoordinates and trigger popup
+      map.setView(driver.coords, 15, { animate: true, duration: 1.2 });
+      setTimeout(function() {
+        driverMarkers[driverId].openPopup();
+      }, 300);
+    }
+  }
+
+  // Live sidebar quick filtering capability (search instantly as the user types)
+  const searchBox = document.getElementById('driver-search-box');
+  if (searchBox) {
+    searchBox.addEventListener('input', function(e) {
+      const searchTerm = e.target.value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.driver-list-card');
+      
+      cards.forEach(function(card) {
+        const driverName = card.getAttribute('data-driver-name');
+        if (driverName.includes(searchTerm)) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  }
+
+  // Update active tracking status indicator label
+  const activeCountBadge = document.getElementById('active-count-badge');
+  if (activeCountBadge) {
+    activeCountBadge.innerText = driverDataRegistry.length + " Internal Drivers Active";
+  }
+</script>
+{% endblock %}

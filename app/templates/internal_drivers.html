@@ -1,78 +1,547 @@
 {% extends "base.html" %}
 
-{% block title %}Internal Drivers | FLOS{% endblock %}
+{% block title %}Drivers | FLOS{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<style>
+  /* Orange-themed Flatpickr calendar styling */
+  .flatpickr-calendar { 
+    border-radius: 16px !important; 
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1) !important; 
+    border: 1px solid #f1f5f9 !important; 
+    font-family: 'Outfit', sans-serif !important; 
+    padding: 4px;
+  }
+  .flatpickr-day.selected, .flatpickr-day.selected:hover { 
+    background: #f97316 !important; 
+    border-color: #f97316 !important; 
+  }
+  .flatpickr-day.inRange { 
+    background: #ffedd5 !important; 
+    border-color: #ffedd5 !important; 
+  }
+  .flatpickr-day:hover { 
+    background: #f1f5f9 !important; 
+  }
+
+  /* Custom soft-bordered badge styles */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
+    transition: all 0.15s ease-in-out;
+  }
+  .badge-red {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border-color: #fecaca;
+  }
+  .badge-orange {
+    background-color: #fff7ed;
+    color: #c2410c;
+    border-color: #ffedd5;
+  }
+  .badge-emerald {
+    background-color: #ecfdf5;
+    color: #047857;
+    border-color: #d1fae5;
+  }
+  .badge-slate {
+    background-color: #f8fafc;
+    color: #475569;
+    border-color: #e2e8f0;
+  }
+  .badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="mb-8 flex justify-between items-end">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-900">Internal Drivers</h1>
-        <p class="text-gray-500 mt-1">Exclusive list of drivers managed internally by your fleet.</p>
+<!-- Premium Control Panel Container -->
+<div class="mb-8 bg-white border border-gray-150 rounded-2xl shadow-sm p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <!-- Left Section: Title and "New" button -->
+    <div class="flex items-center gap-4">
+        <button type="button" onclick="openAddModal()" class="px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-xs font-black rounded-xl shadow-sm hover:shadow-md transition-all uppercase tracking-wider active:scale-95 duration-150 flex-shrink-0">
+            New
+        </button>
+        <div class="flex items-center gap-2">
+            <h1 class="text-xl font-black text-slate-800 tracking-tight">Drivers</h1>
+            <button class="text-gray-300 hover:text-orange-500 transition-colors duration-150">
+                <svg class="w-4 h-4 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+        </div>
     </div>
-    <div class="flex items-center space-x-4">
-        <form action="/internal-drivers" method="GET" class="flex">
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+
+    <!-- Middle Section: Odoo Unified Search & Dropdown -->
+    <div class="flex-grow max-w-xl relative w-full lg:w-auto">
+        <form action="/drivers" method="GET" id="driver-filter-form">
+            <!-- Hidden Fields for State -->
+            <input type="hidden" name="shift" id="filter-shift" value="{{ filters.shift or '' }}">
+            <input type="hidden" name="payment_status" id="filter-payment_status" value="{{ filters.payment_status or '' }}">
+            <input type="hidden" name="date_from" id="filter-date_from" value="{{ filters.date_from or '' }}">
+            <input type="hidden" name="date_to" id="filter-date_to" value="{{ filters.date_to or '' }}">
+            <input type="hidden" name="sort_by" id="filter-sort_by" value="{{ filters.sort_by or 'name' }}">
+            <input type="hidden" name="sort_dir" id="filter-sort_dir" value="{{ filters.sort_dir or 'asc' }}">
+
+            <div class="relative flex items-center border border-gray-200 rounded-xl bg-gray-50/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all min-h-[38px] py-1 px-3">
+                <span class="text-gray-400 mr-2.5 flex-shrink-0">
+                    <svg class="h-4.5 w-4.5 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </span>
+                
+                <!-- Active Filter Pills inside input -->
+                <div class="flex flex-wrap items-center gap-1.5 max-w-[85%] flex-grow">
+                    {% if filters.shift %}
+                    <span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-xs font-bold px-2.5 py-0.5 rounded-lg border border-orange-100">
+                        Shift: {{ filters.shift }}
+                        <button type="button" onclick="setFilter('shift', '')" class="hover:text-red-500 font-extrabold ml-1 leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if filters.payment_status %}
+                    <span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-xs font-bold px-2.5 py-0.5 rounded-lg border border-orange-100">
+                        Status: {{ filters.payment_status|capitalize }}
+                        <button type="button" onclick="setFilter('payment_status', '')" class="hover:text-red-500 font-extrabold ml-1 leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if filters.date_from or filters.date_to %}
+                    <span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-xs font-bold px-2.5 py-0.5 rounded-lg border border-orange-100">
+                        Date: {{ filters.date_from or '...' }} / {{ filters.date_to or '...' }}
+                        <button type="button" onclick="clearDateRange()" class="hover:text-red-500 font-extrabold ml-1 leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    <input type="text" name="search" id="search-input" value="{{ filters.search or '' }}" placeholder="{% if not (filters.shift or filters.payment_status or filters.date_from or filters.date_to) %}Search driver name or phone...{% endif %}" class="bg-transparent border-none focus:ring-0 text-xs py-1 px-1 text-gray-700 placeholder-gray-400 font-semibold outline-none flex-grow min-w-[120px]">
                 </div>
-                <input type="text" name="search" value="{{ request.query_params.get('search', '') }}" placeholder="Search internal drivers..." class="block w-64 pl-10 pr-3 py-1.5 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 sm:text-sm">
+
+                <!-- Caret Button to Toggle Dropdown Menu -->
+                <button type="button" id="dropdown-toggle-btn" class="ml-auto text-gray-400 hover:text-slate-600 focus:outline-none pl-2 border-l border-gray-200 h-5 flex items-center">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
             </div>
         </form>
+
+        <!-- Dropdown Menu Panel (Absolute Overlay) -->
+        <div id="odoo-dropdown-menu" class="hidden absolute top-full left-0 right-0 z-50 mt-2 bg-white border border-gray-100 shadow-2xl rounded-2xl p-5 flex flex-col sm:flex-row gap-6 text-sm divide-y sm:divide-y-0 sm:divide-x divide-gray-100 min-w-[290px] md:min-w-[550px]">
+            <!-- Column 1: Filters -->
+            <div class="flex-1 flex flex-col gap-3">
+                <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                    <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                    Filters
+                </div>
+                
+                <!-- Shift -->
+                <div class="flex flex-col gap-2">
+                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Shift</span>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="shift-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="Day" {% if filters.shift == 'Day' %}checked{% endif %}>
+                        <span>Day</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="shift-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="Night" {% if filters.shift == 'Night' %}checked{% endif %}>
+                        <span>Night</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="shift-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="None" {% if filters.shift == 'None' %}checked{% endif %}>
+                        <span>None</span>
+                    </label>
+                </div>
+
+                <!-- Status -->
+                <div class="flex flex-col gap-2 mt-2">
+                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Payment Status</span>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="status-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="paid" {% if filters.payment_status == 'paid' %}checked{% endif %}>
+                        <span>Paid</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="status-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="partial" {% if filters.payment_status == 'partial' %}checked{% endif %}>
+                        <span>Partial</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="status-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="pending" {% if filters.payment_status == 'pending' %}checked{% endif %}>
+                        <span>Pending</span>
+                    </label>
+                </div>
+                
+                <!-- Date -->
+                <div class="flex flex-col gap-2 mt-2">
+                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Custom Date Range</span>
+                    <input type="text" id="date-range-picker-dropdown" placeholder="Select dates..." class="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 bg-gray-50/50 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all cursor-pointer font-semibold" readonly>
+                </div>
+            </div>
+
+            <!-- Column 2: Sort By -->
+            <div class="flex-1 flex flex-col gap-3 sm:pl-4">
+                <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                    <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                    Sort By
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="radio" name="dropdown-sort" class="sort-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="name" {% if filters.sort_by == 'name' or not filters.sort_by %}checked{% endif %}>
+                        <span>Driver Name</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="radio" name="dropdown-sort" class="sort-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="expected" {% if filters.sort_by == 'expected' %}checked{% endif %}>
+                        <span>Expected Price</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="radio" name="dropdown-sort" class="sort-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="actual" {% if filters.sort_by == 'actual' %}checked{% endif %}>
+                        <span>Paid Amount</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="radio" name="dropdown-sort" class="sort-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="unpaid" {% if filters.sort_by == 'unpaid' %}checked{% endif %}>
+                        <span>Unpaid Amount</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="radio" name="dropdown-sort" class="sort-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="ledger" {% if filters.sort_by == 'ledger' %}checked{% endif %}>
+                        <span>Ledger Balance</span>
+                    </label>
+                </div>
+
+                <div class="flex flex-col gap-2 mt-2">
+                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Direction</span>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="radio" name="dropdown-sort-dir" class="sort-dir-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="asc" {% if filters.sort_dir == 'asc' or not filters.sort_dir %}checked{% endif %}>
+                        <span>Ascending (A-Z)</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="radio" name="dropdown-sort-dir" class="sort-dir-radio text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="desc" {% if filters.sort_dir == 'desc' %}checked{% endif %}>
+                        <span>Descending (Z-A)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Column 3: Favorites/Actions -->
+            <div class="flex-1 flex flex-col gap-3 sm:pl-4">
+                <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                    <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.248.587 1.813l-3.978 2.89a1 1 0 00-.364 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.978-2.89a1 1 0 00-1.176 0l-3.978 2.89c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.364-1.118L2.05 9.204c-.773-.565-.373-1.813.587-1.813h4.907a1 1 0 00.95-.69l1.519-4.674z"></path></svg>
+                    Actions
+                </div>
+                <div class="flex flex-col gap-2.5">
+                    <button type="button" onclick="openSyncWizard()" id="btn-sync-internal" class="flex items-center justify-between text-left text-xs text-orange-600 bg-orange-50/55 hover:bg-orange-50 px-3 py-2 rounded-xl transition-all border border-orange-100 font-bold active:scale-95 duration-150">
+                        <span>Sync Yango Trips</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                    <button type="button" onclick="clearAllFiltersAndSubmit()" class="flex items-center justify-between text-left text-xs text-rose-600 bg-rose-50/55 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all border border-rose-100 font-bold active:scale-95 duration-150">
+                        <span>Clear All Filters</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                    <div class="border-t border-gray-100 my-1 pt-2 select-none">
+                        <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Saved Search Config</span>
+                        <div class="flex items-center gap-1.5 mt-1.5">
+                            <input type="text" placeholder="Search name..." class="text-xs border border-gray-200 rounded-xl px-2 py-1.5 w-full bg-gray-50/50 text-gray-400 font-semibold" readonly value="My Configurations">
+                            <button type="button" class="text-xs px-2.5 py-1.5 bg-gray-100 text-gray-400 rounded-xl cursor-not-allowed font-bold" disabled>Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Section: Odoo style pagination & views -->
+    <div class="flex items-center gap-4 flex-shrink-0 justify-between lg:justify-end w-full lg:w-auto">
+        <!-- Pagination count and chevrons -->
+        <div class="flex items-center gap-2 text-sm text-gray-500 font-semibold select-none">
+            <span>1-{{ drivers_data|length }}/{{ drivers_data|length }}</span>
+            <div class="flex items-center border border-gray-200 bg-white rounded-xl overflow-hidden shadow-xs">
+                <button type="button" class="px-3 py-1.5 hover:bg-gray-50 text-gray-300 hover:text-gray-500 transition-colors border-r border-gray-100 cursor-not-allowed" disabled>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <button type="button" class="px-3 py-1.5 hover:bg-gray-50 text-gray-300 hover:text-gray-500 transition-colors cursor-not-allowed" disabled>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- View Switchers -->
+        <div class="flex items-center border border-gray-200 bg-white rounded-xl overflow-hidden shadow-xs select-none">
+            <!-- List View -->
+            <button type="button" id="btn-list-view" onclick="switchView('list')" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors" title="List View">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+            </button>
+            <!-- Kanban View -->
+            <button type="button" id="btn-kanban-view" onclick="switchView('kanban')" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors border-l border-gray-100" title="Kanban View">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 14a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path></svg>
+            </button>
+        </div>
     </div>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+<!-- Frosted Glass Modal Background -->
+<div id="add-driver-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100/50 transform transition-all">
+        <div class="px-6 py-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+            <h3 class="font-black text-lg text-slate-800 tracking-tight flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+                Add to Fleet
+            </h3>
+            <button onclick="closeAddModal()" class="text-gray-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-50 transition-all">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="relative mb-5">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <svg class="h-4.5 w-4.5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input type="text" id="driver-search-input" onkeyup="searchAllDrivers(this.value)" placeholder="Search by name, phone or ID..." class="block w-full pl-10 pr-3.5 py-3 border border-gray-200 rounded-xl text-sm font-semibold bg-gray-50/50 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all shadow-sm">
+            </div>
+            
+            <div id="search-results" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                <!-- Results will be injected here -->
+                <div class="text-center py-10 text-gray-400 font-semibold text-xs italic">Type to search all fleet drivers...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sync Wizard Modal -->
+<div id="sync-wizard-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100/50 transform transition-all">
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+            <h3 class="font-black text-lg text-slate-800 tracking-tight flex items-center gap-2">
+                <span id="sync-header-pulse" class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                Trips Sync Wizard
+            </h3>
+            <button onclick="closeSyncWizard()" class="text-gray-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-50 transition-all">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        
+        <!-- Modal Content -->
+        <div class="p-6">
+            <!-- Sync Status Block -->
+            <div class="flex flex-col items-center text-center mb-6">
+                <!-- Spinning Loader Container -->
+                <div id="sync-loader" class="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-4 transition-all">
+                    <svg id="sync-icon-static" class="w-8 h-8 text-orange-500 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                </div>
+                
+                <h4 id="sync-status-title" class="font-extrabold text-slate-800 text-base mb-1">Yango Orders Bulk Sync</h4>
+                <p id="sync-status-desc" class="text-xs text-slate-500 font-semibold px-4">Start the bulk synchronization to fetch order histories from Yango for all internal drivers.</p>
+            </div>
+
+            <!-- Stats/Metrics -->
+            <div id="sync-stats-container" class="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-5 text-xs font-semibold text-slate-600 space-y-2.5 hidden">
+                <div id="sync-stat-driver-row" class="flex justify-between items-center pb-2 border-b border-slate-200/50">
+                    <span>Active Driver:</span>
+                    <span id="sync-stat-driver" class="font-bold text-slate-800 text-right truncate max-w-[200px]">None</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>Drivers Processed:</span>
+                    <span id="sync-stat-processed" class="font-bold text-slate-800">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>New Trips Imported:</span>
+                    <span id="sync-stat-inserted" class="font-bold text-emerald-600">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>Trips Updated:</span>
+                    <span id="sync-stat-updated" class="font-bold text-blue-600">0</span>
+                </div>
+            </div>
+
+            <!-- Progress Bar Block -->
+            <div id="sync-progress-container" class="mb-6 hidden">
+                <div class="flex justify-between text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                    <span id="sync-progress-label">Sync Progress</span>
+                    <span id="sync-progress-pct">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200/30">
+                    <div id="sync-progress-bar" class="bg-gradient-to-r from-orange-500 to-orange-600 h-full rounded-full transition-all duration-300 w-0"></div>
+                </div>
+            </div>
+
+            <!-- Last Sync Details -->
+            <div id="sync-last-details" class="flex items-center gap-2 justify-center text-xs font-bold text-slate-400 bg-gray-50/50 py-2.5 rounded-xl border border-dashed border-gray-200/60 mb-6 select-none">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Last Sync: <span id="sync-last-time">Never</span></span>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="closeSyncWizard()" class="flex-1 px-4 py-3 border border-gray-200 hover:bg-gray-50 text-slate-700 text-xs font-bold uppercase rounded-xl transition-all active:scale-95 duration-150 text-center">
+                    Close
+                </button>
+                <button type="button" id="btn-sync-action" onclick="startBulkSyncProcess()" class="flex-1 px-4 py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-orange-500/10 hover:shadow-orange-500/20 transition-all active:scale-95 duration-150 text-center">
+                    Start Sync
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- List View Table Container -->
+<div id="drivers-list-view" class="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden mb-8">
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+        <table class="min-w-full divide-y divide-gray-100 text-sm text-gray-750 bg-white">
+            <thead class="bg-gray-50/75 border-b border-gray-100">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Driver Details</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Operator ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
-                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Joined At</th>
-                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th class="w-8 pl-4 py-3.5 text-left select-none">
+                        <input type="checkbox" class="rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4">
+                    </th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        <a href="javascript:void(0)" onclick="sortByColumn('name')" class="flex items-center gap-1 hover:text-orange-500 transition-all group select-none">
+                            Driver Details
+                            <span class="text-[10px] transition-colors {% if filters.sort_by == 'name' %}text-orange-500 opacity-100{% else %}text-gray-300 opacity-0 group-hover:opacity-100{% endif %}">
+                                {% if filters.sort_by == 'name' %}
+                                    {% if filters.sort_dir == 'asc' %}▲{% else %}▼{% endif %}
+                                {% else %}
+                                    ↕
+                                {% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver ID</th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Phone</th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap select-none">Shift</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        <a href="javascript:void(0)" onclick="sortByColumn('expected')" class="flex items-center justify-end gap-1 hover:text-orange-500 transition-all group select-none">
+                            Expected
+                            <span class="text-[10px] transition-colors {% if filters.sort_by == 'expected' %}text-orange-500 opacity-100{% else %}text-gray-300 opacity-0 group-hover:opacity-100{% endif %}">
+                                {% if filters.sort_by == 'expected' %}
+                                    {% if filters.sort_dir == 'asc' %}▲{% else %}▼{% endif %}
+                                {% else %}
+                                    ↕
+                                {% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        <a href="javascript:void(0)" onclick="sortByColumn('actual')" class="flex items-center justify-end gap-1 hover:text-orange-500 transition-all group select-none">
+                            Paid
+                            <span class="text-[10px] transition-colors {% if filters.sort_by == 'actual' %}text-orange-500 opacity-100{% else %}text-gray-300 opacity-0 group-hover:opacity-100{% endif %}">
+                                {% if filters.sort_by == 'actual' %}
+                                    {% if filters.sort_dir == 'asc' %}▲{% else %}▼{% endif %}
+                                {% else %}
+                                    ↕
+                                {% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        <a href="javascript:void(0)" onclick="sortByColumn('unpaid')" class="flex items-center justify-end gap-1 hover:text-orange-500 transition-all group select-none">
+                            Unpaid
+                            <span class="text-[10px] transition-colors {% if filters.sort_by == 'unpaid' %}text-orange-500 opacity-100{% else %}text-gray-300 opacity-0 group-hover:opacity-100{% endif %}">
+                                {% if filters.sort_by == 'unpaid' %}
+                                    {% if filters.sort_dir == 'asc' %}▲{% else %}▼{% endif %}
+                                {% else %}
+                                    ↕
+                                {% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        <a href="javascript:void(0)" onclick="sortByColumn('ledger')" class="flex items-center justify-end gap-1 hover:text-orange-500 transition-all group select-none">
+                            Ledger Balance
+                            <span class="text-[10px] transition-colors {% if filters.sort_by == 'ledger' %}text-orange-500 opacity-100{% else %}text-gray-300 opacity-0 group-hover:opacity-100{% endif %}">
+                                {% if filters.sort_by == 'ledger' %}
+                                    {% if filters.sort_dir == 'asc' %}▲{% else %}▼{% endif %}
+                                {% else %}
+                                    ↕
+                                {% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th class="px-6 py-3.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap select-none">Status</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for driver in drivers %}
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                            <div class="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xs">
-                                {{ driver.name[0] }}
+            <tbody class="bg-white divide-y divide-gray-50">
+                {% for item in drivers_data %}
+                <tr class="hover:bg-orange-50/15 border-b border-gray-50 last:border-0 transition-all duration-150">
+                    <td class="w-8 pl-4 py-3.5">
+                        <input type="checkbox" class="rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4">
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <div class="h-8 w-8 rounded-full bg-orange-50 text-orange-600 border border-orange-100/50 flex items-center justify-center font-extrabold text-xs uppercase flex-shrink-0 select-none overflow-hidden">
+                                {% if item.driver.avatar_data %}
+                                    <img src="{{ item.driver.avatar_data }}" class="w-full h-full object-cover">
+                                {% else %}
+                                    {{ item.driver.name[0] }}
+                                {% endif %}
                             </div>
-                            <div class="ml-4">
-                                <div class="text-sm font-bold text-gray-900">
-                                    <a href="/drivers/{{ driver.id }}" class="hover:text-purple-600 hover:underline">{{ driver.name }}</a>
-                                </div>
-                            </div>
+                            <a href="/drivers/{{ item.driver.id }}" class="text-xs font-bold text-slate-800 hover:text-orange-500 hover:underline transition-colors duration-150">{{ item.driver.name }}</a>
                         </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
-                        {{ driver.operator_id }}
+                    <td class="px-6 py-3.5 whitespace-nowrap">
+                        <div class="group flex items-center gap-1.5 cursor-pointer text-gray-400 hover:text-orange-600 transition-colors font-mono text-[11px] font-semibold" onclick="copyToClipboard('{{ item.driver.yango_driver_id }}', this.querySelector('.copy-icon'))">
+                            <span>{{ item.driver.yango_driver_id[:12] }}...</span>
+                            <span class="copy-icon opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 012-2v-8a2 2 0 01-2-2h-8a2 2 0 01-2 2v8a2 2 0 012 2z"></path></svg>
+                            </span>
+                        </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ driver.phone or "N/A" }}
+                    <td class="px-6 py-3.5 whitespace-nowrap text-xs text-gray-500 font-semibold font-mono">
+                        {{ item.driver.phone or "—" }}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-center">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            INTERNAL
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                        {{ driver.created_at.strftime('%Y-%m-%d') }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        <select onchange="updateDriverType({{ driver.id }}, this.value)" class="text-xs rounded border-gray-300">
-                            <option value="internal" selected>Stay Internal</option>
-                            <option value="external">Make External</option>
+                    <td class="px-6 py-3.5 whitespace-nowrap select-none">
+                        <select onchange="updateDriverShift({{ item.driver.id }}, this.value)" class="text-xs font-bold rounded-xl px-2.5 py-1.5 border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 
+                            {% if item.driver.shift == 'Day' %}bg-amber-50 text-amber-700 border-amber-200{% elif item.driver.shift == 'Night' %}bg-slate-800 text-white border-slate-700{% else %}bg-slate-50 text-slate-400 border-slate-200{% endif %}">
+                            <option value="None" {% if item.driver.shift == 'None' %}selected{% endif %}>None</option>
+                            <option value="Day" {% if item.driver.shift == 'Day' %}selected{% endif %}>Day</option>
+                            <option value="Night" {% if item.driver.shift == 'Night' %}selected{% endif %}>Night</option>
                         </select>
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-right text-xs font-bold text-slate-700 font-mono">
+                        {{ "{:,.2f}".format(item.expected) }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-right text-xs font-bold font-mono text-emerald-600">
+                        {{ "{:,.2f}".format(item.actual) }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-right text-xs font-bold font-mono {% if item.expected - item.actual > 0.01 %}text-rose-600{% else %}text-gray-400{% endif %}">
+                        {% set unpaid = item.expected - item.actual %}
+                        {{ "{:,.2f}".format([unpaid, 0]|max) }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-right text-xs font-bold font-mono select-none">
+                        {% if item.ledger_balance < -0.01 %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
+                                {{ "{:,.2f}".format(item.ledger_balance) }}
+                            </span>
+                        {% elif item.ledger_balance > 0.01 %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                +{{ "{:,.2f}".format(item.ledger_balance) }}
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-50 text-slate-400 border border-slate-100">
+                                0.00
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-center select-none">
+                        {% if item.expected <= 0 %}
+                            <span class="badge badge-slate">No Trips</span>
+                        {% elif unpaid <= 0.01 %}
+                            <span class="badge badge-emerald">Paid</span>
+                        {% elif item.actual > 0 %}
+                            <span class="badge badge-orange">Partial</span>
+                        {% else %}
+                            <span class="badge badge-red">Pending</span>
+                        {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="px-6 py-10 text-center text-gray-500">
-                        No internal drivers found. You can mark drivers as "Internal" on the <a href="/" class="text-blue-600 underline">Main Dashboard</a>.
+                    <td colspan="9" class="px-6 py-20 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="w-14 h-14 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center mb-4">
+                                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            </div>
+                            <p class="text-base font-bold text-slate-800">No drivers found.</p>
+                            <p class="text-xs text-gray-400 mt-1">Click "New" to search and add fleet drivers.</p>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -81,25 +550,554 @@
     </div>
 </div>
 
+<!-- Grid (Kanban) View -->
+<div id="drivers-kanban-view" class="hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+    {% for item in drivers_data %}
+    {% set unpaid = item.expected - item.actual %}
+    <div class="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative flex flex-col justify-between min-h-[170px]">
+        <!-- Header: Avatar, Name, ID, Shift dropdown -->
+        <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-3">
+                <div class="h-9 w-9 rounded-full bg-orange-50 text-orange-600 border border-orange-100/50 flex items-center justify-center font-extrabold text-xs uppercase flex-shrink-0 select-none overflow-hidden">
+                    {% if item.driver.avatar_data %}
+                        <img src="{{ item.driver.avatar_data }}" class="w-full h-full object-cover">
+                    {% else %}
+                        {{ item.driver.name[0] }}
+                    {% endif %}
+                </div>
+                <div class="min-w-0">
+                    <a href="/drivers/{{ item.driver.id }}" class="text-xs font-bold text-slate-800 hover:text-orange-500 hover:underline block truncate transition-colors duration-155">{{ item.driver.name }}</a>
+                    <span class="text-[10px] font-mono font-semibold text-gray-400 block truncate mt-0.5" title="{{ item.driver.yango_driver_id }}">{{ item.driver.yango_driver_id[:12] }}...</span>
+                </div>
+            </div>
+            
+            <!-- Shift Dropdown Badge -->
+            <select onchange="updateDriverShift({{ item.driver.id }}, this.value)" class="text-[10px] font-extrabold rounded-xl px-2 py-0.5 border cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 
+                {% if item.driver.shift == 'Day' %}bg-amber-50 text-amber-700 border-amber-200{% elif item.driver.shift == 'Night' %}bg-slate-800 text-white border-transparent{% else %}bg-slate-50 text-slate-400 border-slate-200{% endif %}">
+                <option value="None" {% if item.driver.shift == 'None' %}selected{% endif %}>None</option>
+                <option value="Day" {% if item.driver.shift == 'Day' %}selected{% endif %}>Day</option>
+                <option value="Night" {% if item.driver.shift == 'Night' %}selected{% endif %}>Night</option>
+            </select>
+        </div>
+
+        <!-- Body: Phone -->
+        <div class="my-3">
+            <div class="text-xs font-semibold text-gray-400 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                <span>{{ item.driver.phone or "—" }}</span>
+            </div>
+        </div>
+
+        <!-- Financial stats block -->
+        <div class="grid grid-cols-4 gap-1 border-t border-b border-gray-50 py-2.5 text-center text-[10px]">
+            <div>
+                <span class="text-gray-400 block font-bold uppercase tracking-wider text-[8px] mb-0.5">Expected</span>
+                <span class="font-extrabold text-slate-700 font-mono">{{ "{:,.2f}".format(item.expected) }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 block font-bold uppercase tracking-wider text-[8px] mb-0.5">Paid</span>
+                <span class="font-extrabold font-mono text-emerald-600">{{ "{:,.2f}".format(item.actual) }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 block font-bold uppercase tracking-wider text-[8px] mb-0.5">Unpaid</span>
+                <span class="font-extrabold font-mono {% if unpaid > 0.01 %}text-rose-600{% else %}text-gray-400{% endif %}">{{ "{:,.2f}".format([unpaid, 0]|max) }}</span>
+            </div>
+            <div>
+                <span class="text-gray-400 block font-bold uppercase tracking-wider text-[8px] mb-0.5">Ledger</span>
+                <span class="font-extrabold font-mono {% if item.ledger_balance < -0.01 %}text-rose-600{% elif item.ledger_balance > 0.01 %}text-emerald-600{% else %}text-gray-400{% endif %}">
+                    {% if item.ledger_balance > 0.01 %}+{% endif %}{{ "{:,.2f}".format(item.ledger_balance) }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Footer: Status badge -->
+        <div class="flex items-center mt-3 select-none">
+            {% if item.expected <= 0 %}
+                <span class="badge badge-slate">No Trips</span>
+            {% elif unpaid <= 0.01 %}
+                <span class="badge badge-emerald">Paid</span>
+            {% elif item.actual > 0 %}
+                <span class="badge badge-orange">Partial</span>
+            {% else %}
+                <span class="badge badge-red">Pending</span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="col-span-full py-20 text-center bg-white rounded-2xl border border-gray-150 shadow-sm">
+        <div class="flex flex-col items-center">
+            <div class="w-14 h-14 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center mb-4">
+                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </div>
+            <p class="text-base font-bold text-slate-800">No drivers found.</p>
+            <p class="text-xs text-gray-400 mt-1">Click "New" to search and add fleet drivers.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
 <script>
-    async function updateDriverType(driverId, type) {
+    // View Switcher logic
+    function switchView(view) {
+        const listView = document.getElementById('drivers-list-view');
+        const kanbanView = document.getElementById('drivers-kanban-view');
+        const btnList = document.getElementById('btn-list-view');
+        const btnKanban = document.getElementById('btn-kanban-view');
+
+        if (!view) {
+            view = localStorage.getItem('drivers-view-preference') || 'list';
+        }
+
+        if (view === 'kanban') {
+            if (listView) listView.classList.add('hidden');
+            if (kanbanView) kanbanView.classList.remove('hidden');
+            
+            if (btnKanban) {
+                btnKanban.classList.add('bg-orange-50', 'text-[#f97316]');
+                btnKanban.classList.remove('text-gray-400', 'hover:text-gray-600', 'hover:bg-gray-50');
+            }
+            if (btnList) {
+                btnList.classList.remove('bg-orange-50', 'text-[#f97316]');
+                btnList.classList.add('text-gray-400', 'hover:text-gray-600', 'hover:bg-gray-50');
+            }
+            
+            localStorage.setItem('drivers-view-preference', 'kanban');
+        } else {
+            if (listView) listView.classList.remove('hidden');
+            if (kanbanView) kanbanView.classList.add('hidden');
+            
+            if (btnList) {
+                btnList.classList.add('bg-orange-50', 'text-[#f97316]');
+                btnList.classList.remove('text-gray-400', 'hover:text-gray-600', 'hover:bg-gray-50');
+            }
+            if (btnKanban) {
+                btnKanban.classList.remove('bg-orange-50', 'text-[#f97316]');
+                btnKanban.classList.add('text-gray-400', 'hover:text-gray-600', 'hover:bg-gray-50');
+            }
+            
+            localStorage.setItem('drivers-view-preference', 'list');
+        }
+    }
+    
+    // Set default view state on load
+    document.addEventListener('DOMContentLoaded', () => {
+        switchView();
+    });
+
+    // Dropdown toggling logic
+    const toggleBtn = document.getElementById('dropdown-toggle-btn');
+    const dropdownMenu = document.getElementById('odoo-dropdown-menu');
+    const searchInput = document.getElementById('search-input');
+
+    function toggleMenu(show) {
+        if (show === undefined) {
+            dropdownMenu.classList.toggle('hidden');
+        } else if (show) {
+            dropdownMenu.classList.remove('hidden');
+        } else {
+            dropdownMenu.classList.add('hidden');
+        }
+    }
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleMenu();
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('focus', (e) => {
+            toggleMenu(true);
+        });
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('driver-filter-form').submit();
+            }
+        });
+    }
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!dropdownMenu) return;
+        const isClickInside = (toggleBtn && toggleBtn.contains(e.target)) || 
+                              dropdownMenu.contains(e.target) || 
+                              (searchInput && searchInput.contains(e.target));
+                              
+        if (!isClickInside) {
+            toggleMenu(false);
+        }
+    });
+
+    // Helper functions for filter setting
+    function setFilter(name, value) {
+        const input = document.getElementById('filter-' + name);
+        if (input) {
+            input.value = value;
+            document.getElementById('driver-filter-form').submit();
+        }
+    }
+
+    function clearDateRange() {
+        document.getElementById('filter-date_from').value = '';
+        document.getElementById('filter-date_to').value = '';
+        document.getElementById('driver-filter-form').submit();
+    }
+
+    function clearAllFiltersAndSubmit() {
+        if (searchInput) searchInput.value = '';
+        document.getElementById('filter-shift').value = '';
+        document.getElementById('filter-payment_status').value = '';
+        document.getElementById('filter-date_from').value = '';
+        document.getElementById('filter-date_to').value = '';
+        document.getElementById('filter-sort_by').value = 'name';
+        document.getElementById('filter-sort_dir').value = 'asc';
+        document.getElementById('driver-filter-form').submit();
+    }
+
+    function sortByColumn(colName) {
+        const currentSort = document.getElementById('filter-sort_by').value;
+        const currentDir = document.getElementById('filter-sort_dir').value;
+        
+        if (currentSort === colName) {
+            document.getElementById('filter-sort_dir').value = currentDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            document.getElementById('filter-sort_by').value = colName;
+            document.getElementById('filter-sort_dir').value = 'asc';
+        }
+        document.getElementById('driver-filter-form').submit();
+    }
+
+    // Listeners for dropdown checkboxes/radios
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.shift-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                if (this.checked) {
+                    document.querySelectorAll('.shift-checkbox').forEach(other => {
+                        if (other !== this) other.checked = false;
+                    });
+                    setFilter('shift', this.value);
+                } else {
+                    setFilter('shift', '');
+                }
+            });
+        });
+
+        document.querySelectorAll('.status-checkbox').forEach(cb => {
+            cb.addEventListener('change', function() {
+                if (this.checked) {
+                    document.querySelectorAll('.status-checkbox').forEach(other => {
+                        if (other !== this) other.checked = false;
+                    });
+                    setFilter('payment_status', this.value);
+                } else {
+                    setFilter('payment_status', '');
+                }
+            });
+        });
+
+        document.querySelectorAll('.sort-radio').forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.checked) {
+                    document.getElementById('filter-sort_by').value = this.value;
+                    document.getElementById('driver-filter-form').submit();
+                }
+            });
+        });
+
+        document.querySelectorAll('.sort-dir-radio').forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.checked) {
+                    document.getElementById('filter-sort_dir').value = this.value;
+                    document.getElementById('driver-filter-form').submit();
+                }
+            });
+        });
+
+        // Initialize Flatpickr for Range Selection in dropdown
+        flatpickr("#date-range-picker-dropdown", {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            defaultDate: ["{{ filters.date_from }}", "{{ filters.date_to }}"],
+            onClose: function(selectedDates, dateStr, instance) {
+                if (selectedDates.length === 2) {
+                    document.getElementById('filter-date_from').value = instance.formatDate(selectedDates[0], "Y-m-d");
+                    document.getElementById('filter-date_to').value = instance.formatDate(selectedDates[1], "Y-m-d");
+                    document.getElementById('driver-filter-form').submit();
+                } else if (selectedDates.length === 0) {
+                    document.getElementById('filter-date_from').value = '';
+                    document.getElementById('filter-date_to').value = '';
+                    document.getElementById('driver-filter-form').submit();
+                }
+            }
+        });
+    });
+
+    let searchTimeout;
+
+    function openAddModal() {
+        document.getElementById('add-driver-modal').classList.remove('hidden');
+        document.getElementById('driver-search-input').focus();
+    }
+
+    function closeAddModal() {
+        document.getElementById('add-driver-modal').classList.add('hidden');
+        document.getElementById('search-results').innerHTML = '<div class="text-center py-10 text-gray-400 font-semibold text-xs italic">Type to search all fleet drivers...</div>';
+        document.getElementById('driver-search-input').value = '';
+    }
+
+    async function searchAllDrivers(query) {
+        clearTimeout(searchTimeout);
+        const resultsContainer = document.getElementById('search-results');
+
+        if (!query || query.length < 2) {
+            resultsContainer.innerHTML = '<div class="text-center py-10 text-gray-400 font-semibold text-xs italic">Type to search all fleet drivers...</div>';
+            return;
+        }
+
+        resultsContainer.innerHTML = '<div class="text-center py-10 text-orange-400 font-semibold text-xs italic animate-pulse">Searching Yango...</div>';
+
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/yango/search-drivers?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('Search failed');
+                const drivers = await response.json();
+
+                if (drivers.length === 0) {
+                    resultsContainer.innerHTML = '<div class="text-center py-10 text-gray-500 font-semibold text-xs">No drivers found in Yango.</div>';
+                    return;
+                }
+
+                resultsContainer.innerHTML = drivers.map(d => `
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-gray-50/50 hover:border-orange-100 transition-colors">
+                        <div class="flex items-center">
+                            <div class="h-10 w-10 rounded-full bg-orange-50 text-orange-600 border border-orange-100/50 flex items-center justify-center font-extrabold text-sm uppercase">
+                                ${(d.name || '?')[0].toUpperCase()}
+                            </div>
+                            <div class="ml-3">
+                                <div class="text-sm font-bold text-slate-800">${d.name}</div>
+                                <div class="text-[10px] font-mono font-semibold text-gray-400 mt-0.5">${d.yango_driver_id} • ${d.phone || 'No Phone'}</div>
+                            </div>
+                        </div>
+                        <button onclick="addInternalDriver('${d.yango_driver_id}', ${JSON.stringify(d.name).replace(/"/g, '&quot;')}, ${JSON.stringify(d.phone || '').replace(/"/g, '&quot;')})"
+                                class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-sm transition-all active:scale-95 duration-150">
+                            Add to Fleet
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsContainer.innerHTML = '<div class="text-center py-10 text-rose-500 font-bold text-xs">Search failed. Please try again.</div>';
+            }
+        }, 350);
+    }
+
+    async function addInternalDriver(yangoId, name, phone) {
         try {
             const formData = new FormData();
-            formData.append('driver_id', driverId);
-            formData.append('driver_type', type);
-            
-            const response = await fetch('/api/drivers/update-type', {
+            formData.append('yango_driver_id', yangoId);
+            formData.append('name', name);
+            if (phone) formData.append('phone', phone);
+
+            const response = await fetch('/api/drivers/add-internal', {
                 method: 'POST',
                 body: formData
             });
+
+            if (!response.ok) throw new Error('Failed to add driver');
+            closeAddModal();
+            window.location.reload();
+        } catch (error) {
+            console.error('Error adding driver:', error);
+            alert('Failed to add driver. Please try again.');
+        }
+    }
+
+    let syncIntervalId = null;
+
+    function openSyncWizard() {
+        document.getElementById('sync-wizard-modal').classList.remove('hidden');
+        checkSyncStatus();
+    }
+
+    function closeSyncWizard() {
+        document.getElementById('sync-wizard-modal').classList.add('hidden');
+        if (syncIntervalId) {
+            clearInterval(syncIntervalId);
+            syncIntervalId = null;
+        }
+    }
+
+    async function checkSyncStatus() {
+        try {
+            const response = await fetch('/api/sync/status');
             const data = await response.json();
-            if (type === 'external') {
-                // Refresh if they moved someone out of this view
+            updateSyncUI(data);
+        } catch (error) {
+            console.error('Error fetching sync status:', error);
+        }
+    }
+
+    function updateSyncUI(data) {
+        const active = data.active;
+        const lastSync = data.last_sync;
+
+        // Update Last Sync Time
+        const lastTimeSpan = document.getElementById('sync-last-time');
+        if (lastSync) {
+            const dateObj = new Date(lastSync);
+            lastTimeSpan.textContent = dateObj.toLocaleString();
+        } else {
+            lastTimeSpan.textContent = 'Never';
+        }
+
+        const loader = document.getElementById('sync-loader');
+        const headerPulse = document.getElementById('sync-header-pulse');
+        const actionBtn = document.getElementById('btn-sync-action');
+        const statsContainer = document.getElementById('sync-stats-container');
+        const progressContainer = document.getElementById('sync-progress-container');
+        const progressBar = document.getElementById('sync-progress-bar');
+        const progressPct = document.getElementById('sync-progress-pct');
+        const statusTitle = document.getElementById('sync-status-title');
+        const statusDesc = document.getElementById('sync-status-desc');
+
+        if (active.status === 'running') {
+            // Running State
+            if (active.is_individual) {
+                statusTitle.textContent = 'Individual Driver Sync Active';
+                statusDesc.textContent = `A sync is currently in progress for driver ${active.current_driver || '...'}. Bulk sync is locked until this finishes.`;
+            } else {
+                statusTitle.textContent = 'Syncing Yango Orders...';
+                statusDesc.textContent = 'Trips are being imported from Yango in the background. You can safely close this wizard or browse other pages; the import will continue.';
+            }
+            
+            loader.className = 'w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 mb-4 animate-spin';
+            loader.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`;
+            headerPulse.className = 'w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping';
+
+            // Show Stats
+            statsContainer.classList.remove('hidden');
+            document.getElementById('sync-stat-driver-row').classList.remove('hidden');
+            document.getElementById('sync-stat-driver').textContent = active.current_driver || 'Processing...';
+            document.getElementById('sync-stat-processed').textContent = active.drivers_processed;
+            document.getElementById('sync-stat-inserted').textContent = active.trips_inserted;
+            document.getElementById('sync-stat-updated').textContent = active.trips_updated;
+
+            // Show Progress Bar
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = `${active.progress}%`;
+            progressPct.textContent = `${active.progress}%`;
+
+            // Disable Action Button & Show Status
+            actionBtn.disabled = true;
+            actionBtn.className = 'flex-1 px-4 py-3 bg-gray-100 text-gray-400 text-xs font-bold uppercase rounded-xl transition-all duration-150 text-center cursor-not-allowed';
+            actionBtn.textContent = 'Sync In Progress';
+
+            // Start Polling if not already polling
+            if (!syncIntervalId) {
+                syncIntervalId = setInterval(checkSyncStatus, 1500);
+            }
+        } else {
+            // Idle, Completed, or Failed
+            headerPulse.className = 'w-2.5 h-2.5 rounded-full bg-orange-500';
+            loader.className = 'w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-4';
+            loader.innerHTML = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`;
+            
+            // Enable Start Button
+            actionBtn.disabled = false;
+            actionBtn.className = 'flex-1 px-4 py-3 bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold uppercase rounded-xl shadow-md shadow-orange-500/10 hover:shadow-orange-500/20 transition-all active:scale-95 duration-150 text-center';
+            actionBtn.textContent = 'Start Sync';
+
+            if (active.status === 'completed') {
+                statusTitle.textContent = 'Sync Complete!';
+                statusDesc.textContent = `Yango trips bulk sync completed successfully.`;
+                
+                // Show completed stats without active driver
+                statsContainer.classList.remove('hidden');
+                document.getElementById('sync-stat-driver-row').classList.add('hidden');
+                document.getElementById('sync-stat-processed').textContent = active.drivers_processed;
+                document.getElementById('sync-stat-inserted').textContent = active.trips_inserted;
+                document.getElementById('sync-stat-updated').textContent = active.trips_updated;
+
+                progressContainer.classList.remove('hidden');
+                progressBar.style.width = '100%';
+                progressPct.textContent = '100%';
+
+                // Reload after a short delay if we just finished (to see new metrics on the tables)
+                if (syncIntervalId) {
+                    clearInterval(syncIntervalId);
+                    syncIntervalId = null;
+                    setTimeout(() => window.location.reload(), 2000);
+                }
+            } else if (active.status === 'failed') {
+                statusTitle.textContent = 'Sync Failed';
+                statusDesc.textContent = `An error occurred: ${active.error || 'Unknown Error'}`;
+                statsContainer.classList.add('hidden');
+                progressContainer.classList.add('hidden');
+
+                if (syncIntervalId) {
+                    clearInterval(syncIntervalId);
+                    syncIntervalId = null;
+                }
+            } else {
+                // Idle
+                statusTitle.textContent = 'Yango Orders Bulk Sync';
+                statusDesc.textContent = 'Start the bulk synchronization to fetch order histories from Yango for all internal drivers.';
+                statsContainer.classList.add('hidden');
+                progressContainer.classList.add('hidden');
+
+                if (syncIntervalId) {
+                    clearInterval(syncIntervalId);
+                    syncIntervalId = null;
+                }
+            }
+        }
+    }
+
+    async function startBulkSyncProcess() {
+        try {
+            const response = await fetch('/api/sync/internal-trips', { method: 'POST' });
+            const data = await response.json();
+            if (data.status === 'started' || data.status === 'running') {
+                checkSyncStatus();
+            } else {
+                alert(data.message || 'Failed to start sync');
+            }
+        } catch (error) {
+            console.error('Error starting bulk sync:', error);
+            alert('Failed to start bulk sync. Please try again.');
+        }
+    }
+
+    // Auto-check sync status on page load, and if it's active, pop up wizard and poll!
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const response = await fetch('/api/sync/status');
+            const data = await response.json();
+            if (data.active && data.active.status === 'running') {
+                openSyncWizard();
+            }
+        } catch (err) {
+            console.error('Error in auto sync check:', err);
+        }
+    });
+
+    async function updateDriverShift(driverId, shift) {
+        try {
+            const formData = new FormData();
+            formData.append('shift', shift);
+            
+            const response = await fetch(`/api/drivers/${driverId}/update-shift`, {
+                method: 'POST',
+                body: formData
+            });
+            if (response.ok) {
                 window.location.reload();
             }
         } catch (error) {
-            console.error('Error updating driver type:', error);
-            alert("Failed to update driver type.");
+            console.error('Error updating shift:', error);
+            alert("Failed to update shift.");
         }
     }
 </script>

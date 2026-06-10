@@ -19,3 +19,12 @@ ENV/
 # OS generated files
 .DS_Store
 Thumbs.db
+*.md
+/venv
+/venv/*
+*.json
+.DS_Store
+.ini
+.envrc
+*.csv
+*.xlsx

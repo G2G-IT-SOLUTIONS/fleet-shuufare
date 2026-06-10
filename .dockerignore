@@ -1,0 +1,32 @@
+# Docker ignore list
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+.git/
+.gitignore
+.env
+database.db
+sync_debug.log
+.gemini/
+brain/
+scratch/
+.idea/
+.vscode/
+*.csv
+Dockerfile
+docker-compose.yml
+README.md
+API_REFERENCE.md
+TESTING_GUIDE.md
+driver api doc.md
+drivers api doc.md
+order track api.md
+orders api doc.md

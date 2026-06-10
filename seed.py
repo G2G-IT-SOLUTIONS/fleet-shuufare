@@ -14,10 +14,10 @@ def seed_db():
 
         print("Seeding drivers...")
         drivers = [
-            Driver(operator_id="OP-001", name="Abebe Bikila", phone="+251911000001"),
-            Driver(operator_id="OP-002", name="Kenenisa Bekele", phone="+251911000002"),
-            Driver(operator_id="OP-003", name="Tirunesh Dibaba", phone="+251911000003"),
-            Driver(operator_id="OP-004", name="Haile Gebrselassie", phone="+251911000004"),
+            Driver(yango_driver_id="OP-001", name="Abebe Bikila", phone="+251911000001"),
+            Driver(yango_driver_id="OP-002", name="Kenenisa Bekele", phone="+251911000002"),
+            Driver(yango_driver_id="OP-003", name="Tirunesh Dibaba", phone="+251911000003"),
+            Driver(yango_driver_id="OP-004", name="Haile Gebrselassie", phone="+251911000004"),
         ]
         
         session.add_all(drivers)

@@ -19,7 +19,7 @@ else:
         DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
     connect_args = {}
 
-engine = create_engine(DATABASE_URL, echo=True, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: flos-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword123}
+      POSTGRES_DB: ${POSTGRES_DB:-fleet-shuufare}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-fleet-shuufare}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: flos-web
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-rootpassword123}@db:5432/${POSTGRES_DB:-fleet-shuufare}
+      - APP_NAME=${APP_NAME:-G2G Fleet Management}
+      - DEBUG=${DEBUG:-True}
+      - SEED_DB=${SEED_DB:-true}
+      - YANGO_BASE_URL=${YANGO_BASE_URL:-https://fleet-api.yango.tech}
+      - YANGO_API_KEY=${YANGO_API_KEY:-YCbHdwOubAjSjtClcxEwcOCBzVzWgmCgUs}
+      - YANGO_CLIENT_ID=${YANGO_CLIENT_ID:-taxi/park/475f2435754b428ea9f0f000ef7de1fc}
+      - YANGO_PARK_ID=${YANGO_PARK_ID:-475f2435754b428ea9f0f000ef7de1fc}
+      - PLAYSMS_URL=${PLAYSMS_URL:-https://172.168.9.134:8080/index.php}
+      - PLAYSMS_USER=${PLAYSMS_USER:-melaku.tilahun}
+      - PLAYSMS_TOKEN=${PLAYSMS_TOKEN:-e7ef17be6222d434ce346927ff7a758a}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

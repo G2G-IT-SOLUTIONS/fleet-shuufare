@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Factor Authentication | FLOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4 overflow-hidden relative">
+    <!-- Background Accents -->
+    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100 rounded-full blur-[100px] opacity-50"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-100 rounded-full blur-[100px] opacity-50"></div>
+
+    <div class="max-w-md w-full glass rounded-3xl shadow-2xl p-10 z-10">
+        <div class="text-center mb-8">
+            <div class="flex justify-center items-center mb-4">
+                <span class="text-3xl font-bold text-orange-500 tracking-tight">Shuu</span><span class="text-3xl font-bold text-gray-900 tracking-tight">Fare</span>
+            </div>
+            <h1 class="text-xl font-bold text-gray-900">2-Step Verification</h1>
+            <p class="text-sm text-gray-500 mt-2">Enter the 6-digit verification code sent to your registered phone number ending in <span class="font-bold text-slate-800">{{ phone[-4:] if phone else 'xxxx' }}</span></p>
+        </div>
+
+        {% if error %}
+        <div class="mb-6 p-4 bg-red-50 border border-red-100 text-red-700 text-xs rounded-xl flex items-center gap-2.5 font-semibold">
+            <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <div id="resend-success-toast" class="hidden mb-6 p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs rounded-xl flex items-center gap-2.5 font-semibold">
+            <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Verification code resent successfully! Check your phone.</span>
+        </div>
+
+        <!-- 2FA Submission Form -->
+        <form action="/login-2fa" method="POST" class="space-y-6">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2.5 text-center">6-Digit Verification Code</label>
+                <input type="text" 
+                       name="otp" 
+                       id="otp-input"
+                       maxlength="6" 
+                       required 
+                       autofocus
+                       class="block w-full px-4 py-3.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none text-slate-800 text-center text-2xl font-black tracking-[0.5em] placeholder:text-gray-300" 
+                       placeholder="••••••">
+            </div>
+
+            <!-- Resend & Countdown Section -->
+            <div class="flex items-center justify-between text-xs text-gray-500 font-semibold select-none">
+                <span id="countdown-timer">Resend code in 60s</span>
+                <button type="button" id="btn-resend" onclick="resend2FACode()" class="hidden text-orange-600 hover:underline font-bold">Resend Code</button>
+            </div>
+
+            <button type="submit" class="w-full bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg transform transition-all active:scale-[0.98] flex items-center justify-center">
+                <span>Verify & Complete Sign In</span>
+            </button>
+
+            <a href="/logout" class="block text-center text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors select-none">
+                Cancel & Back to Sign In
+            </a>
+        </form>
+
+        <script>
+            let countdownInterval = null;
+            const phone = "{{ phone }}";
+
+            function startTimer(seconds) {
+                const timerText = document.getElementById('countdown-timer');
+                const resendBtn = document.getElementById('btn-resend');
+                
+                timerText.classList.remove('hidden');
+                resendBtn.classList.add('hidden');
+                
+                let remaining = seconds;
+                timerText.innerText = `Resend code in ${remaining}s`;
+                
+                clearInterval(countdownInterval);
+                countdownInterval = setInterval(() => {
+                    remaining--;
+                    if (remaining <= 0) {
+                        clearInterval(countdownInterval);
+                        timerText.classList.add('hidden');
+                        resendBtn.classList.remove('hidden');
+                    } else {
+                        timerText.innerText = `Resend code in ${remaining}s`;
+                    }
+                }, 1000);
+            }
+
+            async function resend2FACode() {
+                if (!phone) return alert('Invalid configuration. Missing phone number.');
+                
+                const resendBtn = document.getElementById('btn-resend');
+                const origText = resendBtn.innerText;
+                resendBtn.disabled = true;
+                resendBtn.innerText = 'Sending...';
+                
+                try {
+                    const response = await fetch('/send-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        const toast = document.getElementById('resend-success-toast');
+                        toast.classList.remove('hidden');
+                        
+                        // Debug console bypass
+                        console.log(`%c[2FA_BYPASS_OTP] Code resent is: ${data.otp}`, "color: #f97316; font-weight: bold; font-size: 14px;");
+                        
+                        setTimeout(() => {
+                            toast.classList.add('hidden');
+                        }, 5000);
+                        
+                        startTimer(60);
+                    } else {
+                        alert(data.detail || 'Failed to resend verification code.');
+                    }
+                } catch(err) {
+                    alert('Server connection error.');
+                } finally {
+                    resendBtn.disabled = false;
+                    resendBtn.innerText = origText;
+                }
+            }
+
+            // Start timer automatically on page load
+            startTimer(60);
+        </script>
+
+        <div class="mt-8 pt-8 border-t border-gray-100 text-center">
+            <p class="text-xs text-gray-400">&copy; 2026 G2G IT Solutions. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

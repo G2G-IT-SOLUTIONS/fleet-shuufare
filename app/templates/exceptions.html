@@ -2,102 +2,441 @@
 
 {% block title %}Exceptions & Audit | FLOS{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<style>
+  /* Orange-themed Flatpickr calendar styling */
+  .flatpickr-calendar { 
+    border-radius: 16px !important; 
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1) !important; 
+    border: 1px solid #f1f5f9 !important; 
+    font-family: 'Outfit', sans-serif !important; 
+    padding: 4px;
+  }
+  .flatpickr-day.selected, .flatpickr-day.selected:hover { 
+    background: #f97316 !important; 
+    border-color: #f97316 !important; 
+  }
+  .flatpickr-day.inRange { 
+    background: #ffedd5 !important; 
+    border-color: #ffedd5 !important; 
+  }
+  .flatpickr-day:hover { 
+    background: #f1f5f9 !important; 
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-2xl font-bold text-gray-900">Financial Exceptions & Audit</h1>
-    <p class="text-gray-500 mt-1">Automatic classification and tracking of daily settlement discrepancies.</p>
+<style>
+:root {
+  --accent: #f97316;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --border: #e2e8f0;
+  --surface-alt: #f8fafc;
+  --text-muted: #64748b;
+}
+
+/* Custom premium badge styles matching orders page */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease-in-out;
+}
+.badge-red {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+.badge-orange {
+  background-color: #fff7ed;
+  color: #c2410c;
+  border-color: #ffedd5;
+}
+.badge-blue {
+  background-color: #eff6ff;
+  color: #1e40af;
+  border-color: #dbeafe;
+}
+.badge-green {
+  background-color: #ecfdf5;
+  color: #047857;
+  border-color: #d1fae5;
+}
+.badge-gray {
+  background-color: #f8fafc;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+.badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Beautiful Modal Overlays with blur */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+.modal-overlay.open {
+  display: flex;
+}
+.modal {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+}
+</style>
+
+<!-- Premium Control Panel Container -->
+<div class="mb-8 bg-white border border-gray-150 rounded-2xl shadow-sm p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative">
+    <!-- Left Section: Title and Upload CSV button -->
+    <div class="flex items-center gap-4">
+        <button type="button" onclick="openUploadModal()" class="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-xs font-black rounded-xl shadow-sm hover:shadow-md transition-all uppercase tracking-wider active:scale-95 duration-150 flex-shrink-0 flex items-center gap-1.5">
+            <svg class="w-4 h-4 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            <span>Upload CSV</span>
+        </button>
+        <div>
+            <h1 class="text-xl font-black text-slate-800 tracking-tight">Exceptions & Audit</h1>
+            <p class="text-[10px] font-bold text-gray-400 mt-0.5 leading-none">Trip-level cash reconciliation</p>
+        </div>
+    </div>
+
+    <!-- Middle/Right Section: Odoo Unified Search & Dropdown -->
+    <div class="flex-grow max-w-xl relative w-full lg:w-auto">
+        <form action="/exceptions" method="GET" id="exceptions-filter-form">
+            <!-- Hidden Fields for State -->
+            <input type="hidden" name="date_from" id="filter-date_from" value="{{ filters.date_from or '' }}">
+            <input type="hidden" name="date_to" id="filter-date_to" value="{{ filters.date_to or '' }}">
+            <input type="hidden" name="status" id="filter-status" value="{{ filters.status or '' }}">
+
+            <div class="relative flex items-center border border-gray-200 rounded-xl bg-gray-50/50 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all min-h-[38px] py-1 px-3">
+                <span class="text-gray-400 mr-2.5 flex-shrink-0">
+                    <svg class="h-4.5 w-4.5 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </span>
+                
+                <!-- Active Filter Pills inside input -->
+                <div class="flex flex-wrap items-center gap-1.5 max-w-[85%] flex-grow">
+                    {% if filters.status %}
+                    <span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-xs font-bold px-2.5 py-0.5 rounded-lg border border-orange-100">
+                        Status: {{ filters.status }}
+                        <button type="button" onclick="setFilter('status', '')" class="hover:text-red-500 font-extrabold ml-1 leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    {% if filters.date_from or filters.date_to %}
+                    <span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-600 text-xs font-bold px-2.5 py-0.5 rounded-lg border border-orange-100">
+                        Date: {{ filters.date_from or '...' }} / {{ filters.date_to or '...' }}
+                        <button type="button" onclick="clearDateRange()" class="hover:text-red-500 font-extrabold ml-1 leading-none">&times;</button>
+                    </span>
+                    {% endif %}
+
+                    <input type="text" id="client-search-input" placeholder="{% if not (filters.status or filters.date_from or filters.date_to) %}Search driver name, ID, or short trip ID...{% endif %}" class="bg-transparent border-none focus:ring-0 text-xs py-1 px-1 text-gray-700 placeholder-gray-400 font-semibold outline-none flex-grow min-w-[120px]">
+                </div>
+
+                <!-- Caret Button to Toggle Dropdown Menu -->
+                <button type="button" id="dropdown-toggle-btn" class="ml-auto text-gray-400 hover:text-slate-600 focus:outline-none pl-2 border-l border-gray-200 h-5 flex items-center">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+            </div>
+        </form>
+
+        <!-- Dropdown Menu Panel (Absolute Overlay) -->
+        <div id="odoo-dropdown-menu" class="hidden absolute top-full left-0 right-0 z-50 mt-2 bg-white border border-gray-100 shadow-2xl rounded-2xl p-5 flex flex-col sm:flex-row gap-6 text-sm divide-y sm:divide-y-0 sm:divide-x divide-gray-100 min-w-[290px] md:min-w-[550px]">
+            <!-- Column 1: Status Filters -->
+            <div class="flex-1 flex flex-col gap-3">
+                <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                    <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                    Status Issues
+                </div>
+                
+                <div class="flex flex-col gap-2">
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="status-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="Missing Deposit" {% if filters.status == 'Missing Deposit' %}checked{% endif %}>
+                        <span>Missing Deposit</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="status-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="Partial Deposit" {% if filters.status == 'Partial Deposit' %}checked{% endif %}>
+                        <span>Partial Deposit</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="status-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="Excess Deposit" {% if filters.status == 'Excess Deposit' %}checked{% endif %}>
+                        <span>Excess Deposit</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-600 hover:text-slate-800 cursor-pointer font-bold text-xs select-none">
+                        <input type="checkbox" class="status-checkbox rounded text-orange-500 focus:ring-orange-500 border-gray-300 w-4 h-4" value="Pending" {% if filters.status == 'Pending' %}checked{% endif %}>
+                        <span>Pending</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Column 2: Date Selector -->
+            <div class="flex-1 flex flex-col gap-3 sm:pl-4">
+                <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                    <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Date Range
+                </div>
+                <div class="flex flex-col gap-2">
+                    <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Reconciliation Dates</span>
+                    <input type="text" id="date-range-picker-dropdown" placeholder="Select date range..." class="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 bg-gray-50/50 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all cursor-pointer font-semibold" readonly>
+                </div>
+            </div>
+
+            <!-- Column 3: Actions -->
+            <div class="flex-1 flex flex-col gap-3 sm:pl-4">
+                <div class="flex items-center gap-1.5 font-extrabold text-slate-800 border-b border-gray-50 pb-2 mb-1.5">
+                    <svg class="w-4 h-4 text-orange-500 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    Actions
+                </div>
+                <div class="flex flex-col gap-2.5">
+                    <button type="submit" form="exceptions-filter-form" class="w-full text-center text-xs text-white bg-slate-900 hover:bg-slate-800 px-3 py-2 rounded-xl transition-all font-bold active:scale-95 duration-150">
+                        Apply Filters
+                    </button>
+                    <button type="button" onclick="clearAllFiltersAndSubmit()" class="flex items-center justify-between text-left text-xs text-rose-600 bg-rose-50/55 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all border border-rose-100 font-bold active:scale-95 duration-150">
+                        <span>Clear Filters</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Exception Summary KPIs -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-red-500 uppercase">Missing Deposits</span>
-            <svg class="h-4 w-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+<!-- Compact KPI Stats Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    <!-- Card 1: Total Expected -->
+    <div class="bg-white border border-gray-150 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+        <div>
+            <div class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Total Expected (Cash)</div>
+            <div class="text-xl font-black text-slate-800 tracking-tight font-sans mt-1">
+                {{ "{:,.2f}".format(kpis.total_expected) }} <span class="text-xs font-bold text-gray-400">ETB</span>
+            </div>
+            <div class="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                All expected cash trips
+            </div>
         </div>
-        <p class="text-2xl font-bold text-gray-900">{{ kpis.missing_count }} Drivers</p>
-        <p class="text-xs text-gray-500 mt-1">Status: Outstanding liability</p>
-    </div>
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-orange-500 uppercase">Partial Deposits</span>
-            <svg class="h-4 w-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <div class="h-9 w-9 rounded-lg bg-orange-50/70 border border-orange-100 flex items-center justify-center text-orange-600 flex-shrink-0">
+            <svg class="w-5 h-5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
         </div>
-        <p class="text-2xl font-bold text-gray-900">{{ kpis.partial_count }} Drivers</p>
-        <p class="text-xs text-gray-500 mt-1">Status: Flagged for review</p>
     </div>
-    <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-blue-500 uppercase">Excess Deposits</span>
-            <svg class="h-4 w-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+
+    <!-- Card 2: Total Reconciled -->
+    <div class="bg-white border border-gray-150 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+        <div>
+            <div class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Total Reconciled</div>
+            <div class="text-xl font-black text-emerald-600 tracking-tight font-sans mt-1">
+                {{ "{:,.2f}".format(kpis.total_actual) }} <span class="text-xs font-bold text-gray-400">ETB</span>
+            </div>
+            <div class="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                {{ kpis.verified_count }} trips verified
+            </div>
         </div>
-        <p class="text-2xl font-bold text-gray-900">{{ kpis.excess_count }} Drivers</p>
-        <p class="text-xs text-gray-500 mt-1">Status: Flagged for investigation</p>
+        <div class="h-9 w-9 rounded-lg bg-emerald-50/70 border border-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0">
+            <svg class="w-5 h-5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
     </div>
-    <div class="bg-blue-600 p-6 rounded-xl shadow-lg text-white">
-        <p class="text-xs font-bold text-blue-200 uppercase mb-2">Compliance Score</p>
-        <p class="text-3xl font-bold">{{ "{:.1f}%".format(kpis.reconciliation_rate) }}</p>
-        <div class="mt-2 w-full bg-blue-700 rounded-full h-1.5">
-            <div class="bg-white h-1.5 rounded-full" style="width: {{ kpis.reconciliation_rate }}%"></div>
+
+    <!-- Card 3: Total Exceptions -->
+    <div class="bg-white border border-gray-150 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+        <div>
+            <div class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Total Exceptions</div>
+            <div class="text-xl font-black text-rose-600 tracking-tight font-sans mt-1">
+                {{ kpis.missing_count + kpis.partial_count }} <span class="text-xs font-bold text-gray-400">Trips</span>
+            </div>
+            <div class="text-[10px] text-gray-400 mt-1">
+                <span class="font-bold text-rose-600">{{ kpis.missing_count }}</span> missing · <span class="font-bold text-amber-500">{{ kpis.partial_count }}</span> partial
+            </div>
+        </div>
+        <div class="h-9 w-9 rounded-lg bg-rose-50/70 border border-rose-100 flex items-center justify-center text-rose-600 flex-shrink-0">
+            <svg class="w-5 h-5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Card 4: Overall Compliance -->
+    <div class="bg-white border border-gray-150 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between">
+        <div>
+            <div class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Overall Compliance</div>
+            <div class="text-xl font-black text-slate-800 tracking-tight font-sans mt-1">
+                {{ "{:.1f}%".format(kpis.reconciliation_rate) }}
+            </div>
+            <div class="w-24 bg-gray-100 rounded-full h-1 mt-2 overflow-hidden">
+                <div class="bg-orange-500 h-1 rounded-full" style="width: {{ kpis.reconciliation_rate }}%"></div>
+            </div>
+        </div>
+        <div class="h-9 w-9 rounded-lg bg-orange-50/70 border border-orange-100 flex items-center justify-center text-orange-600 flex-shrink-0">
+            <svg class="w-5 h-5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"></path>
+            </svg>
         </div>
     </div>
 </div>
-
-<!-- Main Exception Table -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-    <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-        <h3 class="text-sm font-bold text-gray-900 uppercase">Settlement Exceptions ({{ today }})</h3>
-        <div class="flex space-x-2">
-            <button class="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-semibold text-gray-600 hover:bg-gray-50">Export Exception Log</button>
-        </div>
-    </div>
+<!-- Main Exceptions Table -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-150 overflow-hidden mb-12">
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-white">
+        <table class="min-w-full divide-y divide-gray-100" id="exceptions-table">
+            <thead class="bg-gray-50/75 border-b border-gray-100">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Driver / ID</th>
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Expected Earnings</th>
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actual Deposit</th>
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Variance</th>
-                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Classification</th>
-                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Managerial Status</th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider w-12">#</th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Driver</th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trip Detail</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Expected (ETB)</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Actual (ETB)</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Variance</th>
+                    <th class="px-6 py-3.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-gray-50 bg-white">
                 {% for item in data %}
-                <tr class="hover:bg-red-50/30 transition-colors">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-bold text-gray-900">{{ item.driver.name }}</div>
-                        <div class="text-xs text-gray-500">{{ item.driver.operator_id }}</div>
+                <tr class="exception-row hover:bg-orange-50/15 transition-all duration-150 border-b border-gray-50 last:border-0">
+                    <td class="px-6 py-4 whitespace-nowrap text-[10px] font-mono text-gray-400 sequence-num font-semibold">
+                        {{ loop.index }}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">{{ "{:,.2f}".format(item.expected) }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">{{ "{:,.2f}".format(item.actual) }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-red-600">
-                        {{ "{:,.2f}".format(item.expected - item.actual) }}
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <a href="/drivers/{{ item.driver.id }}" class="h-8 w-8 rounded-full bg-orange-50 border border-orange-100/50 flex items-center justify-center font-extrabold text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-100/50 hover:border-orange-200/50 transition-all flex-shrink-0">
+                                {{ (item.driver.name or '?')[0]|upper }}
+                            </a>
+                            <div>
+                                <a href="/drivers/{{ item.driver.id }}" class="text-sm font-bold text-slate-800 hover:text-orange-500 transition-colors driver-name-text">{{ item.driver.name }}</a>
+                                <div class="text-[10px] font-mono font-semibold text-gray-400 mt-0.5 driver-id-text">{{ item.driver.yango_driver_id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-extrabold text-orange-600 trip-id-text">#{{ item.short_id }}</div>
+                        <div class="text-[10px] text-gray-400 font-mono font-semibold mt-0.5">{{ item.date }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-slate-600 font-mono">
+                        {{ "{:,.2f}".format(item.expected) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-emerald-600 font-mono">
+                        {{ "{:,.2f}".format(item.actual) }}
+                    </td>
+                    {% set variance = item.actual - item.expected %}
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-extrabold font-mono {% if variance < -0.01 %}text-rose-600{% elif variance > 0.01 %}text-blue-600{% else %}text-slate-500{% endif %}">
+                        {{ "{:,.2f}".format(variance) }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-center">
-                        <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase 
-                            {% if item.status == 'Missing Deposit' %}bg-red-100 text-red-800
-                            {% elif item.status == 'Partial Deposit' %}bg-orange-100 text-orange-800
-                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                        <span class="badge badge-{{ item.color }}" 
+                              onclick="openResolveModal('{{ item.id }}', '{{ item.status }}', '{{ item.notes or '' }}')"
+                              title="Click to resolve manually">
                             {{ item.status }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="text-xs italic text-gray-500">
-                            {% if item.status == 'Missing Deposit' %}Outstanding liability
-                            {% elif item.status == 'Partial Deposit' %}Flagged for managerial review
-                            {% else %}Flagged for investigation{% endif %}
                         </span>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
-                        <svg class="mx-auto h-12 w-12 text-green-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <p class="text-lg font-medium">All settlements verified! No exceptions found.</p>
-                        <p class="text-sm">Congratulations, your fleet is 100% compliant for today.</p>
+                    <td colspan="7" class="px-6 py-20 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
+                                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <p class="text-base font-bold text-slate-800">Perfectly Reconciled!</p>
+                            <p class="text-xs text-gray-400 mt-1">No trip exceptions found for the selected filters.</p>
+                        </div>
                     </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Modern Pagination Footer -->
+    <div class="px-6 py-4 bg-gray-50/75 border-t border-gray-100 flex items-center justify-between">
+        <span class="text-xs font-bold text-gray-400" id="pagination-info">Showing 0 to 0 of 0 trips</span>
+        <div class="flex gap-2">
+            <button onclick="prevPage()" id="btn-prev" class="px-3.5 py-1.5 border border-gray-200 rounded-xl text-xs font-bold bg-white text-gray-600 shadow-sm hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
+            <button onclick="nextPage()" id="btn-next" class="px-3.5 py-1.5 border border-gray-200 rounded-xl text-xs font-bold bg-white text-gray-600 shadow-sm hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+        </div>
+    </div>
+</div>>
+
+<!-- Reconciliation Batches Header -->
+<div class="mb-5">
+    <h2 class="text-2xl font-black text-slate-800 tracking-tight">Reconciliation Batches</h2>
+    <p class="text-sm font-medium text-gray-400 mt-1">History of uploaded Telebirr CSV files.</p>
+</div>
+
+<!-- Reconciliation Batches Table -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-150 overflow-hidden mb-12">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-100">
+            <thead class="bg-gray-50/75 border-b border-gray-100">
+                <tr>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</th>
+                    <th class="px-6 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Filename</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Transactions</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total ETB</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Trips Reconciled</th>
+                    <th class="px-6 py-3.5 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider w-24">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50 bg-white">
+                {% for batch in batches %}
+                <tr class="hover:bg-orange-50/15 transition-all duration-150 border-b border-gray-50 last:border-0">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-700">
+                        {{ batch.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-800">
+                        {{ batch.filename }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-slate-600 font-mono">
+                        {{ batch.total_transactions }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-emerald-600 font-mono">
+                        {{ "{:,.2f}".format(batch.total_amount) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-slate-600 font-mono">
+                        {{ batch.trips_reconciled }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        {% if batch.status == 'active' %}
+                            <span class="badge badge-green">Active</span>
+                        {% else %}
+                            <span class="badge badge-gray">Reversed</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-xs">
+                        {% if batch.status == 'active' and loop.first %}
+                        <button onclick="reverseBatch({{ batch.id }})" class="text-[10px] font-extrabold text-rose-500 uppercase tracking-wider hover:text-rose-700 transition-colors">Reverse</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="px-6 py-10 text-center text-xs text-gray-400 font-semibold">No reconciliation batches found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -105,25 +444,476 @@
     </div>
 </div>
 
-<!-- Daily Settlement Cycle & Audit Info -->
-<div class="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
-    <div class="bg-gray-900 rounded-xl p-8 text-white">
-        <h4 class="text-lg font-bold mb-4 flex items-center">
-            <svg class="h-6 w-6 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            Daily Settlement Cycle
-        </h4>
-        <p class="text-gray-400 text-sm leading-relaxed">
-            FLOS performs time-based reconciliation on a daily basis. At the end of each cycle, driver-level financial statuses are updated. This prevents the accumulation of unresolved discrepancies and maintains peak financial accuracy for your park.
-        </p>
-    </div>
-    <div class="bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
-        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <svg class="h-6 w-6 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01m-.01 4h.01"></path></svg>
-            Audit & Compliance
-        </h4>
-        <p class="text-gray-600 text-sm leading-relaxed">
-            All validations and reconciliation results are logged and audit-ready. FLOS maintains a permanent record of driver-level settlement status, exception logs, and resolution paths for absolute financial transparency.
-        </p>
+<!-- Resolve Exception Modal -->
+<div class="modal-overlay" id="resolveModal">
+    <div class="modal max-w-md w-full bg-white rounded-2xl shadow-2xl p-6 border border-gray-100 transform scale-95 transition-all duration-300 mx-4">
+        <div class="flex justify-between items-center mb-5 pb-3 border-b border-gray-50">
+            <h3 class="font-black text-lg text-slate-800 tracking-tight flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                Resolve Trip Exception
+            </h3>
+            <button onclick="closeResolveModal()" class="text-gray-400 hover:text-slate-600 text-2xl font-light leading-none p-1 rounded-lg hover:bg-slate-50 transition-all">&times;</button>
+        </div>
+        <form id="resolveForm" onsubmit="submitResolution(event)">
+            <input type="hidden" id="resolve-trip-id">
+            <div class="mb-4">
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">New Status</label>
+                <select id="resolve-status" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all bg-gray-50/50 hover:bg-gray-50 focus:bg-white text-slate-700">
+                    <option value="Verified">Verified (Manager Manual)</option>
+                    <option value="Partial Deposit">Partial Deposit</option>
+                    <option value="Missing Deposit">Missing Deposit</option>
+                    <option value="Excess Deposit">Excess Deposit</option>
+                </select>
+            </div>
+            <div class="mb-6">
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Manager Note / Explanation</label>
+                <textarea id="resolve-notes" class="w-full border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all bg-gray-50/50 focus:bg-white text-slate-700 min-h-[100px]" placeholder="Explain why this trip is being marked as verified..."></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" class="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold py-2.5 rounded-xl text-sm shadow-sm hover:shadow-md transition-all active:scale-95 duration-150">Save Resolution</button>
+                <button type="button" onclick="closeResolveModal()" class="flex-1 bg-slate-50 text-slate-600 font-extrabold py-2.5 rounded-xl text-sm hover:bg-slate-100 transition-all">Cancel</button>
+            </div>
+        </form>
     </div>
 </div>
+
+<!-- Upload CSV Modal -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal max-w-lg w-full bg-white rounded-2xl shadow-2xl p-6 border border-gray-100 transform scale-95 transition-all duration-300 mx-4">
+        <div class="flex justify-between items-center mb-3 pb-2 border-b border-gray-50">
+            <h3 class="font-black text-lg text-slate-800 tracking-tight flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Upload Telebirr Portal CSV
+            </h3>
+            <button onclick="closeUploadModal()" class="text-gray-400 hover:text-slate-600 text-2xl font-light leading-none p-1 rounded-lg hover:bg-slate-50 transition-all">&times;</button>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed mb-5">Select the organization e-money account CSV downloaded from Telebirr portal. Only rows with a numeric Operator ID in the details will be processed.</p>
+        
+        <form id="uploadForm" onsubmit="handleUpload(event)">
+            <div class="mb-5 p-6 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center bg-slate-50/50 hover:bg-orange-50/20 hover:border-orange-300 transition-all duration-300 cursor-pointer group" onclick="document.getElementById('csv_file').click()">
+                <div class="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                    <svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                </div>
+                <span id="file-label" class="text-sm font-bold text-slate-700 transition-colors duration-200">Click to select CSV file</span>
+                <span class="text-[10px] font-semibold text-gray-400 mt-1">Accepts only .csv format</span>
+                <input type="file" id="csv_file" name="file" accept=".csv" class="hidden" onchange="analyzeCSV(this)">
+            </div>
+
+            <!-- High-Fidelity Analysis Stats -->
+            <div id="analysis-stats" class="hidden mb-5 p-4 bg-orange-50/40 border border-orange-100 rounded-2xl">
+                <div class="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                    Analysis Result
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-white p-3 border border-orange-100/50 rounded-xl shadow-xs">
+                        <div class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Payments</div>
+                        <div id="stat-payments" class="text-lg font-black text-slate-800 font-sans mt-0.5">0</div>
+                    </div>
+                    <div class="bg-white p-3 border border-orange-100/50 rounded-xl shadow-xs">
+                        <div class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Operators</div>
+                        <div id="stat-operators" class="text-lg font-black text-slate-800 font-sans mt-0.5">0</div>
+                    </div>
+                    <div class="bg-white p-3 border border-orange-100/50 rounded-xl shadow-xs">
+                        <div class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Total ETB</div>
+                        <div id="stat-amount" class="text-lg font-black text-slate-800 font-sans mt-0.5">0.00</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Beautiful Processing Bar -->
+            <div id="upload-progress" class="hidden mb-5 bg-slate-50 p-3.5 border border-gray-100 rounded-xl">
+                <div class="flex justify-between text-[10px] font-black text-slate-400 tracking-widest mb-2">
+                    <span>PROCESSING RECONCILIATION...</span>
+                    <span id="progress-percent" class="text-orange-500">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                    <div id="progress-bar" class="bg-orange-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button type="submit" id="submit-upload" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed">Process Reconciliation</button>
+                <button type="button" onclick="closeUploadModal()" class="flex-1 bg-slate-50 text-slate-600 font-extrabold py-2.5 rounded-xl text-sm hover:bg-slate-100 transition-all">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Pagination & Interactive Filter State
+let currentPage = 1;
+const rowsPerPage = 20;
+const rawRows = Array.from(document.querySelectorAll('.exception-row'));
+let filteredRows = [...rawRows];
+
+function filterRows() {
+    const query = document.getElementById('client-search-input')?.value.toLowerCase().trim() || '';
+    
+    if (!query) {
+        filteredRows = [...rawRows];
+    } else {
+        filteredRows = rawRows.filter(row => {
+            const name = row.querySelector('.driver-name-text')?.textContent.toLowerCase() || '';
+            const driverId = row.querySelector('.driver-id-text')?.textContent.toLowerCase() || '';
+            const tripId = row.querySelector('.trip-id-text')?.textContent.toLowerCase() || '';
+            return name.includes(query) || driverId.includes(query) || tripId.includes(query);
+        });
+    }
+    
+    currentPage = 1; // Reset to page 1 of findings
+    renderPage();
+}
+
+function renderPage() {
+    const totalPages = Math.ceil(filteredRows.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+
+    // Hide all raw rows first
+    rawRows.forEach(row => row.style.display = 'none');
+
+    // Show only the visible filtered rows slice
+    filteredRows.forEach((row, i) => {
+        if (i >= start && i < end) {
+            row.style.display = '';
+            const seqNumCell = row.querySelector('.sequence-num');
+            if (seqNumCell) {
+                seqNumCell.textContent = start + i + 1;
+            }
+        }
+    });
+
+    // Toggle Empty Search Result State
+    const emptyRow = document.getElementById('empty-search-row');
+    if (filteredRows.length === 0) {
+        if (!emptyRow) {
+            const tbody = document.querySelector('#exceptions-table tbody');
+            const tr = document.createElement('tr');
+            tr.id = 'empty-search-row';
+            tr.innerHTML = `
+                <td colspan="7" class="px-6 py-20 text-center">
+                    <div class="flex flex-col items-center">
+                        <div class="w-14 h-14 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mb-4">
+                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-base font-bold text-slate-800">No matching exceptions</p>
+                        <p class="text-xs text-gray-400 mt-1">Try refining your search query or clear active filters.</p>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        } else {
+            emptyRow.style.display = '';
+        }
+    } else {
+        if (emptyRow) {
+            emptyRow.style.display = 'none';
+        }
+    }
+
+    document.getElementById('pagination-info').textContent = `Showing ${filteredRows.length > 0 ? start + 1 : 0} to ${Math.min(end, filteredRows.length)} of ${filteredRows.length} trips`;
+    document.getElementById('btn-prev').disabled = currentPage === 1;
+    document.getElementById('btn-next').disabled = currentPage === totalPages;
+}
+
+function prevPage() { currentPage--; renderPage(); }
+function nextPage() { currentPage++; renderPage(); }
+
+// Odoo Filter Dropdown Toggling & Form Submit Handlers
+const toggleBtn = document.getElementById('dropdown-toggle-btn');
+const dropdownMenu = document.getElementById('odoo-dropdown-menu');
+const searchInput = document.getElementById('client-search-input');
+
+function toggleMenu(show) {
+    if (!dropdownMenu) return;
+    if (show === undefined) {
+        dropdownMenu.classList.toggle('hidden');
+    } else if (show) {
+        dropdownMenu.classList.remove('hidden');
+    } else {
+        dropdownMenu.classList.add('hidden');
+    }
+}
+
+if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleMenu();
+    });
+}
+
+if (searchInput) {
+    searchInput.addEventListener('focus', () => {
+        toggleMenu(true);
+    });
+    // Wire up local filtering on keystroke input
+    searchInput.addEventListener('input', filterRows);
+}
+
+// Close Dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!dropdownMenu) return;
+    const isClickInside = (toggleBtn && toggleBtn.contains(e.target)) || 
+                          dropdownMenu.contains(e.target) || 
+                          (searchInput && searchInput.contains(e.target));
+                          
+    if (!isClickInside) {
+        toggleMenu(false);
+    }
+});
+
+function setFilter(name, value) {
+    const input = document.getElementById('filter-' + name);
+    if (input) {
+        input.value = value;
+        document.getElementById('exceptions-filter-form').submit();
+    }
+}
+
+function clearDateRange() {
+    document.getElementById('filter-date_from').value = '';
+    document.getElementById('filter-date_to').value = '';
+    document.getElementById('exceptions-filter-form').submit();
+}
+
+function clearAllFiltersAndSubmit() {
+    if (searchInput) searchInput.value = '';
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-date_from').value = '';
+    document.getElementById('filter-date_to').value = '';
+    document.getElementById('exceptions-filter-form').submit();
+}
+
+// Modal Resolution Logic
+function openResolveModal(tripId, currentStatus, notes) {
+    document.getElementById('resolve-trip-id').value = tripId;
+    document.getElementById('resolve-status').value = currentStatus;
+    document.getElementById('resolve-notes').value = notes;
+    document.getElementById('resolveModal').classList.add('open');
+}
+
+function closeResolveModal() {
+    document.getElementById('resolveModal').classList.remove('open');
+}
+
+async function submitResolution(e) {
+    e.preventDefault();
+    const tripId = document.getElementById('resolve-trip-id').value;
+    const status = document.getElementById('resolve-status').value;
+    const notes = document.getElementById('resolve-notes').value;
+    
+    const formData = new FormData();
+    formData.append('status', status);
+    formData.append('notes', notes);
+    
+    try {
+        const res = await fetch(`/api/trips/${tripId}/resolve`, {
+            method: 'POST',
+            body: formData
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert('Failed to update trip status');
+        }
+    } catch (err) {
+        alert('Error communicating with server');
+    }
+}
+
+// Upload CSV Logic
+function openUploadModal() { 
+    document.getElementById('uploadModal').classList.add('open'); 
+    resetUploadModal();
+}
+function closeUploadModal() { document.getElementById('uploadModal').classList.remove('open'); }
+
+function resetUploadModal() {
+    document.getElementById('file-label').textContent = 'Click to select CSV file';
+    document.getElementById('file-label').style.color = '';
+    document.getElementById('analysis-stats').classList.add('hidden');
+    document.getElementById('upload-progress').classList.add('hidden');
+    document.getElementById('submit-upload').disabled = true;
+    document.getElementById('submit-upload').textContent = 'Process Reconciliation';
+    document.getElementById('csv_file').value = '';
+}
+
+async function analyzeCSV(input) {
+    if (!input.files || !input.files[0]) return;
+    
+    const file = input.files[0];
+    document.getElementById('file-label').textContent = file.name;
+    document.getElementById('file-label').style.color = '#0f172a';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const statsDiv = document.getElementById('analysis-stats');
+    const submitBtn = document.getElementById('submit-upload');
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Analyzing...';
+    
+    try {
+        const res = await fetch('/api/reconciliation/analyze-telebirr-csv', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            document.getElementById('stat-payments').textContent = data.valid_payments;
+            document.getElementById('stat-operators').textContent = data.unique_operators;
+            document.getElementById('stat-amount').textContent = data.total_amount.toLocaleString(undefined, {minimumFractionDigits: 2});
+            
+            statsDiv.classList.remove('hidden');
+            submitBtn.disabled = data.valid_payments === 0;
+            submitBtn.textContent = 'Start Reconcile (' + data.valid_payments + ')';
+        } else {
+            alert('Analysis failed: ' + (data.detail || data.error));
+            resetUploadModal();
+        }
+    } catch (err) {
+        alert('Error analyzing file');
+        resetUploadModal();
+    }
+}
+
+async function handleUpload(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('csv_file');
+    if (!fileInput.files[0]) {
+        alert('Please select a CSV file first');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    const btn = document.getElementById('submit-upload');
+    const progress = document.getElementById('upload-progress');
+    const bar = document.getElementById('progress-bar');
+    const percentText = document.getElementById('progress-percent');
+    
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+    progress.classList.remove('hidden');
+    bar.style.width = '30%'; 
+    percentText.textContent = '30%';
+    
+    try {
+        const res = await fetch('/api/reconciliation/upload-telebirr-csv', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await res.json();
+        bar.style.width = '100%';
+        percentText.textContent = '100%';
+        
+        if (res.ok) {
+            alert(`Success!\nProcessed: ${result.processed}\nTrips Reconciled: ${result.trips_reconciled}`);
+            window.location.reload();
+        } else {
+            alert('Upload failed: ' + (result.detail || result.error || 'Unknown error'));
+            btn.disabled = false;
+            btn.textContent = 'Process Reconciliation';
+            progress.classList.add('hidden');
+        }
+    } catch (err) {
+        alert('Error uploading file');
+        btn.disabled = false;
+        btn.textContent = 'Process Reconciliation';
+        progress.classList.add('hidden');
+    }
+}
+
+async function reverseBatch(batchId) {
+    if (!confirm('Are you sure you want to reverse this reconciliation batch? This will undo all matched trips and revert their amounts. This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`/api/reconciliation/batches/${batchId}/reverse`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert(`Batch reversed successfully.\nTrips reverted: ${data.trips_reverted}\nTransactions unreconciled: ${data.transactions_unreconciled}`);
+            window.location.reload();
+        } else {
+            alert('Failed to reverse batch: ' + (data.detail || data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error communicating with server');
+    }
+}
+
+// DOM Setup & Init
+document.addEventListener('DOMContentLoaded', () => {
+    // Synchronize checkbox selected status visually inside dropdown menu
+    document.querySelectorAll('.status-checkbox').forEach(cb => {
+        cb.addEventListener('change', function() {
+            if (this.checked) {
+                document.querySelectorAll('.status-checkbox').forEach(other => {
+                    if (other !== this) other.checked = false;
+                });
+                setFilter('status', this.value);
+            } else {
+                setFilter('status', '');
+            }
+        });
+    });
+
+    // Initialize Flatpickr for Range Selection in dropdown
+    if (document.getElementById('date-range-picker-dropdown')) {
+        flatpickr("#date-range-picker-dropdown", {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            defaultDate: [{% if filters.date_from %}"{{ filters.date_from }}"{% endif %}{% if filters.date_from and filters.date_to %}, {% endif %}{% if filters.date_to %}"{{ filters.date_to }}"{% endif %}],
+            onClose: function(selectedDates, dateStr, instance) {
+                if (selectedDates.length === 2) {
+                    document.getElementById('filter-date_from').value = instance.formatDate(selectedDates[0], "Y-m-d");
+                    document.getElementById('filter-date_to').value = instance.formatDate(selectedDates[1], "Y-m-d");
+                    document.getElementById('exceptions-filter-form').submit();
+                } else if (selectedDates.length === 0) {
+                    document.getElementById('filter-date_from').value = '';
+                    document.getElementById('filter-date_to').value = '';
+                    document.getElementById('exceptions-filter-form').submit();
+                }
+            }
+        });
+    }
+
+    // Set initial custom range input label text
+    const dateDropdownInput = document.getElementById('date-range-picker-dropdown');
+    if (dateDropdownInput) {
+        const fromDate = "{{ filters.date_from or '' }}";
+        const toDate = "{{ filters.date_to or '' }}";
+        if (fromDate && toDate) {
+            dateDropdownInput.value = `${fromDate} to ${toDate}`;
+        } else if (fromDate) {
+            dateDropdownInput.value = `${fromDate}`;
+        }
+    }
+
+    // Initial page rendering
+    renderPage();
+
+    // Check if redirecting from dashboard with upload=true
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('upload') === 'true') {
+        openUploadModal();
+    }
+});
+</script>
 {% endblock %}

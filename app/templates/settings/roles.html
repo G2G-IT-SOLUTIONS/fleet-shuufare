@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Roles & Permissions | FLOS{% endblock %}
+
+{% block content %}
+<div class="w-full space-y-6">
+
+    <!-- Premium Control Panel Header -->
+    <div class="bg-white border border-gray-150 rounded-2xl shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <!-- Title and Stats Pill -->
+        <div class="flex items-center gap-3">
+            <div>
+                <h1 class="text-xl font-black text-slate-800 tracking-tight">Roles & Permissions</h1>
+                <p class="text-[10px] font-bold text-gray-400 mt-0.5 leading-none">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 font-extrabold text-[9px] mr-1">
+                        3 System Roles
+                    </span>
+                    User access boundaries and functional hierarchies
+                </p>
+            </div>
+        </div>
+
+        <!-- Breadcrumb Indicator -->
+        <div class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest bg-gray-50 border border-gray-150 rounded-xl px-3.5 py-2 select-none self-start sm:self-auto">
+            Config &gt; Security
+        </div>
+    </div>
+
+    <!-- Three Elevated Comparison Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- CARD 1: Admin -->
+        <div class="bg-white rounded-2xl shadow-sm border border-rose-100 hover:border-rose-200 p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-md relative overflow-hidden group">
+            <div class="absolute top-0 right-0 h-16 w-16 bg-rose-50/20 rounded-full translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-300"></div>
+            
+            <div class="space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="h-9 w-9 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center font-extrabold text-xs text-rose-700 select-none">
+                        AD
+                    </div>
+                    <div>
+                        <h2 class="text-xs font-black text-slate-800 leading-none">Administrator</h2>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-100/50 font-extrabold text-[8px] mt-1 uppercase tracking-wider select-none leading-none">
+                            Full Control
+                        </span>
+                    </div>
+                </div>
+                
+                <p class="text-[11px] text-gray-400 font-semibold leading-relaxed">
+                    Full read and write authority across all database tables, models, credential rules, and system options.
+                </p>
+            </div>
+        </div>
+
+        <!-- CARD 2: Manager -->
+        <div class="bg-white rounded-2xl shadow-sm border border-blue-100 hover:border-blue-200 p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-md relative overflow-hidden group">
+            <div class="absolute top-0 right-0 h-16 w-16 bg-blue-50/20 rounded-full translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-300"></div>
+            
+            <div class="space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center font-extrabold text-xs text-blue-700 select-none">
+                        MG
+                    </div>
+                    <div>
+                        <h2 class="text-xs font-black text-slate-800 leading-none">Operations Manager</h2>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100/50 font-extrabold text-[8px] mt-1 uppercase tracking-wider select-none leading-none">
+                            Operational
+                        </span>
+                    </div>
+                </div>
+                
+                <p class="text-[11px] text-gray-400 font-semibold leading-relaxed">
+                    Access to drivers shift logs, exceptions reconciliation tables, CSV statements, and manual Yango API syncing.
+                </p>
+            </div>
+        </div>
+
+        <!-- CARD 3: Auditor -->
+        <div class="bg-white rounded-2xl shadow-sm border border-purple-100 hover:border-purple-200 p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-md relative overflow-hidden group">
+            <div class="absolute top-0 right-0 h-16 w-16 bg-purple-50/20 rounded-full translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-300"></div>
+            
+            <div class="space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="h-9 w-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center font-extrabold text-xs text-purple-700 select-none">
+                        AU
+                    </div>
+                    <div>
+                        <h2 class="text-xs font-black text-slate-800 leading-none">Financial Auditor</h2>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100/50 font-extrabold text-[8px] mt-1 uppercase tracking-wider select-none leading-none">
+                            Read Only
+                        </span>
+                    </div>
+                </div>
+                
+                <p class="text-[11px] text-gray-400 font-semibold leading-relaxed">
+                    Read-only compliance oversight of verified exceptions, historical driver variances, and dashboard curves.
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- High-Fidelity Permissions Matrix Grid -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-150 overflow-hidden">
+        <div class="px-6 py-4.5 border-b border-gray-100">
+            <h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Functional Capability Matrix</h3>
+            <p class="text-[10px] text-gray-400 font-bold mt-1">Granular breakdown of system capabilities mapped across roles</p>
+        </div>
+        
+        <div class="overflow-x-auto w-full">
+            <table class="w-full min-w-[600px] divide-y divide-gray-100 text-sm">
+                <thead class="bg-gray-50/75">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">System Capability</th>
+                        <th class="px-6 py-4 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider w-36">Administrator</th>
+                        <th class="px-6 py-4 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider w-36">Operations Manager</th>
+                        <th class="px-6 py-4 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider w-36">Financial Auditor</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-50">
+                    
+                    <!-- Capability 1 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">System Configurations & DB Log Parameters</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Capability 2 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">Staff & User Account Management</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Capability 3 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">Driver Registry & Shifts Customization</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Capability 4 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">Yango API Data Pulls & Synchronizations</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Capability 5 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">Deposit CSV Documents Import</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Capability 6 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">Financial Exception Reconciliation</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-slate-50 text-slate-300">
+                                <svg class="w-2.5 h-2.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Capability 7 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">Completed Orders Logs Review</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Capability 8 -->
+                    <tr class="hover:bg-orange-50/10 transition-colors">
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-slate-800 text-xs">Compliance Dashboard & Analytical Visuals</div>
+                        </td>
+                        <!-- Admin -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Manager -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                        <!-- Auditor -->
+                        <td class="px-6 py-3.5 text-center">
+                            <span class="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                                <svg class="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                            </span>
+                        </td>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

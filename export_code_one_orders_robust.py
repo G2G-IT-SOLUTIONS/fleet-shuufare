@@ -74,8 +74,8 @@ async def fetch_page(client, cursor, start_date, end_date):
 async def main():
     print("Starting robust Yango Export for Code 1...")
     
-    start_date = "2026-04-01T00:00:00+03:00"
-    end_date = datetime.now().strftime("%Y-%m-%dT23:59:59+03:00")
+    start_date = "2026-05-04T00:00:00+03:00"
+    end_date = "2026-05-10T23:59:59+03:00"
     
     cursor = None
     all_code_one_completed = []

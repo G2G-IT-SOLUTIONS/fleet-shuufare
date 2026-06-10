@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+
+{% block title %}User Management | FLOS{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Premium Slim Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="w-full space-y-6">
+
+    <!-- Premium Control Panel Header -->
+    <div class="bg-white border border-gray-150 rounded-2xl shadow-sm p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <!-- Title and Stats Pill -->
+        <div class="flex items-center gap-3">
+            <div>
+                <h1 class="text-xl font-black text-slate-800 tracking-tight">User Management</h1>
+                <p class="text-[10px] font-bold text-gray-400 mt-0.5 leading-none">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 font-extrabold text-[9px] mr-1">
+                        {{ users|length }} accounts
+                    </span>
+                    Oversee system access and roles for all company staff
+                </p>
+            </div>
+        </div>
+
+        <!-- Right Side: Action Trigger -->
+        <div>
+            <button type="button" 
+                    onclick="openCreateModal()" 
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl shadow-sm hover:shadow transition-all font-bold text-xs select-none active:scale-95 duration-150 hover:-translate-y-0.5">
+                <svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+                </svg>
+                Create New User
+            </button>
+        </div>
+    </div>
+
+    <!-- Table Card Container -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-150 overflow-hidden">
+        <div class="overflow-x-auto w-full">
+            <table class="w-full min-w-[800px] divide-y divide-gray-100 text-sm">
+                <thead class="bg-gray-50/75 border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Staff Member</th>
+                        <th class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider w-36">Role</th>
+                        <th class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider w-36">Status</th>
+                        <th class="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider w-52">Last Login</th>
+                        <th class="px-6 py-4 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider w-24">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-50">
+                    {% for u in users %}
+                    <tr class="hover:bg-orange-50/15 transition-all duration-150 border-b border-gray-50 last:border-0">
+                        <!-- Staff Member Name and Email -->
+                        <td class="px-6 py-4.5 whitespace-nowrap">
+                            <div class="flex items-center gap-3">
+                                <!-- Monogram Avatar -->
+                                <div class="h-9 w-9 rounded-full bg-orange-50 border border-orange-100/50 flex items-center justify-center font-extrabold text-sm text-orange-600 uppercase flex-shrink-0">
+                                    {{ (u.full_name or u.email or '?')[0]|upper }}
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-bold text-slate-800 leading-none">{{ u.full_name or 'Unnamed User' }}</span>
+                                    <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                                        <span class="text-[10px] text-gray-400 font-mono font-bold leading-none">{{ u.email }}</span>
+                                        {% if u.phone %}
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 font-bold font-mono" title="Registered Phone">{{ u.phone }}</span>
+                                        {% else %}
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 border border-gray-150 font-semibold" title="No Phone Registered">No SMS</span>
+                                        {% endif %}
+                                        
+                                        {% if u.role == 'admin' %}
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-100 font-extrabold" title="2FA Mandatory for Administrators">2FA Locked</span>
+                                        {% elif u.two_factor_enabled %}
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 font-extrabold" title="2FA Active">2FA On</span>
+                                        {% else %}
+                                        <span class="text-[9px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-400 border border-gray-100 font-semibold" title="2FA Inactive">2FA Off</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Role Badge -->
+                        <td class="px-6 py-4.5 whitespace-nowrap">
+                            {% if u.role == 'admin' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-rose-50 text-rose-700 border border-rose-100/80 uppercase tracking-wider select-none leading-5">
+                                ADMIN
+                            </span>
+                            {% elif u.role == 'manager' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100/80 uppercase tracking-wider select-none leading-5">
+                                MANAGER
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-purple-50 text-purple-700 border border-purple-100/80 uppercase tracking-wider select-none leading-5">
+                                {{ u.role|upper }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status Badge -->
+                        <td class="px-6 py-4.5 whitespace-nowrap">
+                            {% if u.is_active %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-wider select-none leading-5">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                                ACTIVE
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold bg-gray-50 text-gray-400 border border-gray-150 uppercase tracking-wider select-none leading-5">
+                                <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+                                DEACTIVATED
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Last Login Time -->
+                        <td class="px-6 py-4.5 whitespace-nowrap font-semibold font-mono text-xs text-slate-600">
+                            {% if u.last_login %}
+                            <div>{{ u.last_login.strftime('%Y-%m-%d') }}</div>
+                            <div class="text-[10px] text-gray-400 font-bold mt-0.5">{{ u.last_login.strftime('%H:%M') }}</div>
+                            {% else %}
+                            <span class="text-gray-300 italic">Never logged in</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Edit Account Action Settings Gear -->
+                        <td class="px-6 py-4.5 whitespace-nowrap text-right">
+                            <button type="button" 
+                                    onclick="editUser({{ u.id }}, '{{ u.role }}', {{ 'true' if u.is_active else 'false' }}, '{{ u.phone or '' }}', {{ 'true' if u.two_factor_enabled else 'false' }})" 
+                                    class="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-all active:scale-95 duration-150" 
+                                    title="Edit User Details">
+                                <svg class="w-4.5 h-4.5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODALS CONTAINER ================= -->
+
+<!-- Create Account Modal -->
+<div id="createModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm items-center justify-center z-50 p-4 transition-all duration-300">
+    <div class="bg-white border border-gray-100 shadow-2xl rounded-2xl max-w-md w-full overflow-hidden transform transition-all duration-300 scale-100 flex flex-col">
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-xs font-black text-slate-800 uppercase tracking-wider">Create New Account</h2>
+            <button type="button" 
+                    onclick="closeCreateModal()" 
+                    class="text-gray-400 hover:text-slate-600 hover:bg-gray-100 p-1.5 rounded-lg transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <form id="createForm" onsubmit="handleCreate(event)">
+            <div class="p-6 space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Full Name</label>
+                    <input type="text" 
+                           name="full_name" 
+                           required 
+                           placeholder="John Doe" 
+                           class="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none rounded-xl py-2 px-3 text-xs font-semibold text-slate-800">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Company Email</label>
+                    <input type="email" 
+                           name="email" 
+                           required 
+                           placeholder="john@shuufare.com" 
+                           class="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none rounded-xl py-2 px-3 text-xs font-semibold text-slate-800">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Phone Number (For SMS Login / OTP)</label>
+                    <input type="text" 
+                           name="phone" 
+                           id="create-phone"
+                           placeholder="+2519xxxxxxxx" 
+                           class="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none rounded-xl py-2 px-3 text-xs font-semibold text-slate-800">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Role</label>
+                        <select name="role" 
+                                id="create-role"
+                                onchange="toggleCreate2FA()"
+                                class="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none rounded-xl py-2.5 px-3 text-xs font-semibold text-slate-800">
+                            <option value="manager">Manager</option>
+                            <option value="auditor">Auditor</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+
+                    <div class="flex flex-col">
+                        <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Initial Password</label>
+                        <input type="password" 
+                               name="password" 
+                               required 
+                               placeholder="••••••••" 
+                               class="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none rounded-xl py-2 px-3 text-xs font-semibold text-slate-800">
+                    </div>
+                </div>
+
+                <!-- 2FA Checkbox inside Create Modal -->
+                <div class="flex items-center justify-between bg-gray-50/50 border border-gray-150 rounded-xl p-3">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                            Enable 2FA SMS Verification
+                            <span id="create-2fa-badge" class="hidden text-[8px] font-black bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none">Mandatory</span>
+                        </span>
+                        <span class="text-[9px] text-gray-400">Require SMS OTP in addition to password during sign in.</span>
+                    </div>
+                    <div>
+                        <input type="checkbox" 
+                               name="two_factor_enabled" 
+                               id="create-2fa"
+                               value="true"
+                               class="text-orange-500 focus:ring-orange-500 border-gray-300 w-4.5 h-4.5 rounded cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Guidance Info Note -->
+                <div class="p-3 bg-orange-50/50 border border-orange-100 rounded-xl flex items-start gap-2.5">
+                    <svg class="w-4.5 h-4.5 text-orange-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button type="button" 
+                        onclick="closeCreateModal()" 
+                        class="px-4 py-2 text-xs font-bold text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-xl transition-all">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all active:scale-95 duration-150">
+                    Create Account
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Account Modal -->
+<div id="editModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm items-center justify-center z-50 p-4 transition-all duration-300">
+    <div class="bg-white border border-gray-100 shadow-2xl rounded-2xl max-w-md w-full overflow-hidden transform transition-all duration-300 scale-100 flex flex-col">
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-sm font-black text-slate-800 uppercase tracking-wider">Edit User Account</h2>
+            <button type="button" 
+                    onclick="closeEditModal()" 
+                    class="text-gray-400 hover:text-slate-600 hover:bg-gray-100 p-1.5 rounded-lg transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <form id="editForm" onsubmit="handleEdit(event)">
+            <input type="hidden" name="user_id" id="edit-user-id">
+            <div class="p-6 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Account Role</label>
+                    <select name="role" 
+                            id="edit-role" 
+                            onchange="toggleEdit2FA()"
+                            class="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none rounded-xl py-2.5 px-3 text-xs font-semibold text-slate-800">
+                        <option value="manager">Manager</option>
+                        <option value="auditor">Auditor</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Phone Number (For SMS Login / OTP)</label>
+                    <input type="text" 
+                           name="phone" 
+                           id="edit-phone"
+                           placeholder="+2519xxxxxxxx" 
+                           class="w-full bg-gray-50/50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all outline-none rounded-xl py-2 px-3 text-xs font-semibold text-slate-800">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5">Account Status</label>
+                    <div class="flex items-center gap-6 mt-1 bg-gray-50/50 border border-gray-150 rounded-xl p-3">
+                        <label class="inline-flex items-center gap-2 cursor-pointer group">
+                            <input type="radio" 
+                                   name="is_active" 
+                                   value="true" 
+                                   id="edit-active-true"
+                                   class="text-orange-500 focus:ring-orange-500 border-gray-300 w-4.5 h-4.5">
+                            <span class="text-xs font-bold text-emerald-600 group-hover:text-emerald-700 select-none">Active</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer group">
+                            <input type="radio" 
+                                   name="is_active" 
+                                   value="false" 
+                                   id="edit-active-false"
+                                   class="text-orange-500 focus:ring-orange-500 border-gray-300 w-4.5 h-4.5">
+                            <span class="text-xs font-bold text-gray-400 group-hover:text-gray-500 select-none">Deactivated</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2FA Checkbox inside Edit Modal -->
+                <div class="flex items-center justify-between bg-gray-50/50 border border-gray-150 rounded-xl p-3">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                            Enable 2FA SMS Verification
+                            <span id="edit-2fa-badge" class="hidden text-[8px] font-black bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none">Mandatory</span>
+                        </span>
+                        <span class="text-[9px] text-gray-400">Require SMS OTP in addition to password during sign in.</span>
+                    </div>
+                    <div>
+                        <input type="checkbox" 
+                               name="two_factor_enabled" 
+                               id="edit-2fa"
+                               value="true"
+                               class="text-orange-500 focus:ring-orange-500 border-gray-300 w-4.5 h-4.5 rounded cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button type="button" 
+                        onclick="closeEditModal()" 
+                        class="px-4 py-2 text-xs font-bold text-gray-500 hover:text-slate-800 hover:bg-gray-100 rounded-xl transition-all">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all active:scale-95 duration-150">
+                    Update User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= JAVASCRIPT LOGIC ================= -->
+
+<script>
+// Open and Close Modals with Smooth flex Toggle transitions
+function openCreateModal() {
+    // Reset form and check role to trigger initial toggle state
+    document.getElementById('createForm').reset();
+    toggleCreate2FA();
+    
+    const modal = document.getElementById('createModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeCreateModal() {
+    const modal = document.getElementById('createModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function toggleCreate2FA() {
+    const role = document.getElementById('create-role').value;
+    const chk = document.getElementById('create-2fa');
+    const badge = document.getElementById('create-2fa-badge');
+    
+    if (role === 'admin') {
+        chk.checked = true;
+        chk.disabled = true;
+        badge.classList.remove('hidden');
+    } else {
+        chk.disabled = false;
+        badge.classList.add('hidden');
+    }
+}
+
+function toggleEdit2FA() {
+    const role = document.getElementById('edit-role').value;
+    const chk = document.getElementById('edit-2fa');
+    const badge = document.getElementById('edit-2fa-badge');
+    
+    if (role === 'admin') {
+        chk.checked = true;
+        chk.disabled = true;
+        badge.classList.remove('hidden');
+    } else {
+        chk.disabled = false;
+        badge.classList.add('hidden');
+    }
+}
+
+async function handleCreate(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    // Explicitly add two_factor_enabled if checkbox is disabled but checked
+    const role = document.getElementById('create-role').value;
+    if (role === 'admin') {
+        formData.set('two_factor_enabled', 'true');
+    }
+    
+    try {
+        const res = await fetch('/api/users', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert(data.detail || 'Failed to create user');
+        }
+    } catch(err) {
+        alert('Server error');
+    }
+}
+
+function editUser(id, role, isActive, phone, twoFactorEnabled) {
+    document.getElementById('edit-user-id').value = id;
+    document.getElementById('edit-role').value = role;
+    document.getElementById('edit-phone').value = phone || '';
+    document.getElementById('edit-active-true').checked = isActive;
+    document.getElementById('edit-active-false').checked = !isActive;
+    
+    const chk = document.getElementById('edit-2fa');
+    const badge = document.getElementById('edit-2fa-badge');
+    if (role === 'admin') {
+        chk.checked = true;
+        chk.disabled = true;
+        badge.classList.remove('hidden');
+    } else {
+        chk.checked = twoFactorEnabled;
+        chk.disabled = false;
+        badge.classList.add('hidden');
+    }
+    
+    const modal = document.getElementById('editModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeEditModal() {
+    const modal = document.getElementById('editModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function handleEdit(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const userId = formData.get('user_id');
+    
+    // Explicitly set two_factor_enabled if it's admin (disabled checkbox)
+    const role = document.getElementById('edit-role').value;
+    if (role === 'admin') {
+        formData.set('two_factor_enabled', 'true');
+    } else if (!formData.get('two_factor_enabled')) {
+        formData.set('two_factor_enabled', 'false');
+    }
+    
+    try {
+        const res = await fetch(`/api/users/${userId}`, { method: 'PATCH', body: formData });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            alert(data.detail || 'Update failed');
+        }
+    } catch(err) {
+        alert('Server error');
+    }
+}
+
+// Auto prefix +251 for Ethiopian phone number in User Management
+function bindEthiopianPrefix(phoneInput) {
+    if (!phoneInput) return;
+    const prefix = '+251';
+    phoneInput.addEventListener('focus', () => {
+        if (!phoneInput.value) {
+            phoneInput.value = prefix;
+        }
+    });
+    phoneInput.addEventListener('input', () => {
+        let value = phoneInput.value;
+        if (value.startsWith('0')) {
+            value = prefix + value.substring(1);
+        } else if (value.startsWith('9')) {
+            value = prefix + value;
+        }
+        if (!value.startsWith(prefix)) {
+            const digits = value.replace(/\D/g, '');
+            if (digits.startsWith('251')) {
+                value = '+' + digits;
+            } else {
+                value = prefix + digits;
+            }
+        }
+        phoneInput.value = value.charAt(0) + value.slice(1).replace(/[^\d]/g, '');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    bindEthiopianPrefix(document.getElementById('create-phone'));
+    bindEthiopianPrefix(document.getElementById('edit-phone'));
+});
+</script>
+{% endblock %}
