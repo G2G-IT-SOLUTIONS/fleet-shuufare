@@ -36,7 +36,7 @@ async def login_submit(
     if not user.is_active:
         return RedirectResponse(url="/login?error=Account deactivated", status_code=303)
         
-    is_2fa_required = (user.role == "admin") or user.two_factor_enabled
+    is_2fa_required = user.two_factor_enabled
     if is_2fa_required:
         if not user.phone:
             return RedirectResponse(url="/login?error=2FA is required for your account, but no phone number is registered. Please contact an administrator.", status_code=303)
