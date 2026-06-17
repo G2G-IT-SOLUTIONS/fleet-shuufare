@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Form, Depends, Response, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select, or_
-from datetime import datetime
+from datetime import timezone, datetime
 from pydantic import BaseModel
 
 from app.core.dependencies import get_session, pwd_context, templates
@@ -56,7 +56,7 @@ async def login_submit(
         return response
 
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.add(user)
     db.commit()
     
@@ -104,7 +104,7 @@ async def login_2fa_submit(
         return RedirectResponse(url="/login-2fa?error=Invalid or expired verification code.", status_code=303)
         
     # OTP verified! Establish full session
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.add(user)
     db.commit()
     
@@ -179,7 +179,7 @@ async def verify_otp_endpoint(
          raise HTTPException(status_code=404, detail="User account not found or deactivated.")
          
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.add(user)
     db.commit()
     

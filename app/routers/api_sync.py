@@ -39,7 +39,7 @@ def _parse_dt(dt_str):
         except Exception:
             return None
 
-def _upsert_trip(db, o, driver_id):
+def _upsert_trip(db, o, driver_id, cash_collected=None):
     o_id = o.get("id")
     if not o_id:
         return None, False, False
@@ -72,6 +72,7 @@ def _upsert_trip(db, o, driver_id):
             category=o.get("category"),
             payment_method=o.get("payment_method"),
             price=price,
+            cash_collected=cash_collected,
             provider=o.get("provider"),
             booked_at=booked_at,
             yango_created_at=created_at,
@@ -87,17 +88,20 @@ def _upsert_trip(db, o, driver_id):
             driver_work_rule=work_rule.get("name"),
             passenger_name=passenger_info.get("name"),
             mileage=o.get("mileage"),
-            synced_at=datetime.utcnow()
+            synced_at=datetime.now(timezone.utc)
         )
         db.add(db_trip)
         return o_id, True, False
     else:
         changed = db_trip.status != o.get("status") or (not db_trip.ended_at and ended_at)
-        if changed:
+        if changed or (cash_collected is not None and db_trip.cash_collected != cash_collected):
             db_trip.status = o.get("status", "")
             db_trip.ended_at = ended_at
             db_trip.price = price
-            db_trip.synced_at = datetime.utcnow()
+            if cash_collected is not None:
+                db_trip.cash_collected = cash_collected
+            db_trip.payment_method = o.get("payment_method")
+            db_trip.synced_at = datetime.now(timezone.utc)
         return o_id, False, changed
 
 
@@ -107,7 +111,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
         "status": "running",
         "progress": 0,
         "current_driver": "Initializing...",
-        "started_at": datetime.utcnow().isoformat() + "Z",
+        "started_at": datetime.now(timezone.utc).isoformat() + "Z",
         "completed_at": None,
         "drivers_processed": 0,
         "trips_inserted": 0,
@@ -126,7 +130,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
                         message="The scheduled automated bulk sync has been initiated in the background.",
                         type="info",
                         is_read=False,
-                        created_at=datetime.utcnow()
+                        created_at=datetime.now(timezone.utc)
                     )
                 else:
                     start_notif = Notification(
@@ -134,7 +138,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
                         message="A manual bulk trips sync has been initiated in the background for all internal drivers.",
                         type="info",
                         is_read=False,
-                        created_at=datetime.utcnow()
+                        created_at=datetime.now(timezone.utc)
                     )
                 db.add(start_notif)
                 db.commit()
@@ -144,15 +148,27 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
             order_sync_conf = db.get(SystemConfig, "LATEST_ORDERS_SYNC_DAYS")
             lookback_days = int(order_sync_conf.value) if order_sync_conf else 1
             
+            from app.services.reconciliation import get_shift_windows
+            
             internal_drivers = db.exec(select(Driver).where(Driver.driver_type == "internal")).all()
             # Extract driver tuples to decouple from active DB session objects
-            drivers_data = [(d.id, d.name, d.yango_driver_id) for d in internal_drivers]
+            drivers_data = [(d.id, d.name, d.yango_driver_id, d.shift) for d in internal_drivers]
+
+            now = datetime.now(timezone.utc)
+            date_from_day = date.today() - timedelta(days=lookback_days)
             
+            day_shift_windows = get_shift_windows(db, "Day", date_from_day)
+            night_shift_windows = get_shift_windows(db, "Night", date_from_day)
+            none_shift_windows = get_shift_windows(db, "None", date_from_day)
+            
+            shift_starts = {
+                "Day": day_shift_windows[0],
+                "Night": night_shift_windows[0],
+                "None": none_shift_windows[0]
+            }
         # Session 1 is closed. The database connection is returned to the pool, and all locks are released.
 
-        now = datetime.now(timezone.utc)
-        date_from_day = date.today() - timedelta(days=lookback_days)
-        date_from = datetime.combine(date_from_day, datetime.min.time()).replace(tzinfo=timezone.utc)
+        # Session 1 is closed. The database connection is returned to the pool, and all locks are released.
         
         total_drivers = len(drivers_data)
         drivers_processed = 0
@@ -163,17 +179,19 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
             active_syncs["bulk"]["status"] = "completed"
             active_syncs["bulk"]["progress"] = 100
             active_syncs["bulk"]["current_driver"] = "No drivers found"
-            active_syncs["bulk"]["completed_at"] = datetime.utcnow().isoformat() + "Z"
+            active_syncs["bulk"]["completed_at"] = datetime.now(timezone.utc).isoformat() + "Z"
             return
 
-        for driver_id, driver_name, yango_driver_id in drivers_data:
+        for driver_id, driver_name, yango_driver_id, shift in drivers_data:
             active_syncs["bulk"]["current_driver"] = driver_name
+            
+            driver_date_from = shift_starts.get(shift, shift_starts["None"])
             
             yango_orders = []
             try:
                 # Slow network call - executed with NO active database sessions or transactions held.
                 yango_orders = await yango_client.get_all_completed_orders(
-                    date_from=date_from,
+                    date_from=driver_date_from,
                     date_to=now,
                     driver_profile_id=yango_driver_id
                 )
@@ -182,10 +200,30 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
             
             # --- Session 2: Short-lived database session to write trips ---
             if yango_orders:
+                # Fetch exact cash transactions
+                order_ids = [o.get("id") for o in yango_orders if o.get("id") and o.get("payment_method") == "cash"]
+                cash_map = {}
+                if order_ids:
+                    try:
+                        transactions = await yango_client.get_order_transactions(order_ids)
+                        for tx in transactions:
+                            if tx.get("category_id") == "cash_collected":
+                                o_id = tx.get("order_id")
+                                amt_str = tx.get("amount")
+                                if o_id and amt_str:
+                                    try:
+                                        cash_map[o_id] = float(amt_str)
+                                    except ValueError:
+                                        pass
+                    except Exception as tx_err:
+                        print(f"Error fetching transactions for driver {driver_name}: {tx_err}")
+                        
                 try:
                     with Session(engine) as db:
                         for o in yango_orders:
-                            _, inserted, updated = _upsert_trip(db, o, driver_id)
+                            o_id = o.get("id")
+                            exact_cash = cash_map.get(o_id)
+                            _, inserted, updated = _upsert_trip(db, o, driver_id, cash_collected=exact_cash)
                             if inserted: trips_inserted += 1
                             if updated:  trips_updated += 1
                         db.commit()
@@ -217,15 +255,15 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
             if not last_sync_conf:
                 last_sync_conf = SystemConfig(
                     key=config_key,
-                    value=datetime.utcnow().isoformat() + "Z",
+                    value=datetime.now(timezone.utc).isoformat() + "Z",
                     description="Timestamp of last bulk trips sync",
                     data_type="string",
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.now(timezone.utc)
                 )
                 db.add(last_sync_conf)
             else:
-                last_sync_conf.value = datetime.utcnow().isoformat() + "Z"
-                last_sync_conf.updated_at = datetime.utcnow()
+                last_sync_conf.value = datetime.now(timezone.utc).isoformat() + "Z"
+                last_sync_conf.updated_at = datetime.now(timezone.utc)
                 db.add(last_sync_conf)
                 
             db.commit()
@@ -238,7 +276,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
                         message=f"Scheduled sync completed successfully: Processed {drivers_processed} drivers, imported {trips_inserted} new trips, and updated {trips_updated} trips.",
                         type="success",
                         is_read=False,
-                        created_at=datetime.utcnow()
+                        created_at=datetime.now(timezone.utc)
                     )
                 else:
                     notif = Notification(
@@ -246,7 +284,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
                         message=f"Manual sync completed successfully: Processed {drivers_processed} drivers, imported {trips_inserted} new trips, and updated {trips_updated} trips.",
                         type="success",
                         is_read=False,
-                        created_at=datetime.utcnow()
+                        created_at=datetime.now(timezone.utc)
                     )
                 db.add(notif)
                 db.commit()
@@ -256,7 +294,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
         active_syncs["bulk"]["status"] = "completed"
         active_syncs["bulk"]["progress"] = 100
         active_syncs["bulk"]["current_driver"] = None
-        active_syncs["bulk"]["completed_at"] = datetime.utcnow().isoformat() + "Z"
+        active_syncs["bulk"]["completed_at"] = datetime.now(timezone.utc).isoformat() + "Z"
 
     except Exception as e:
         import traceback
@@ -271,7 +309,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
                         message=f"Scheduled sync failed: {str(e)}",
                         type="error",
                         is_read=False,
-                        created_at=datetime.utcnow()
+                        created_at=datetime.now(timezone.utc)
                     )
                 else:
                     notif = Notification(
@@ -279,7 +317,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
                         message=f"Manual sync failed: {str(e)}",
                         type="error",
                         is_read=False,
-                        created_at=datetime.utcnow()
+                        created_at=datetime.now(timezone.utc)
                     )
                 db.add(notif)
                 db.commit()
@@ -288,7 +326,7 @@ async def run_bulk_sync_background(is_scheduled: bool = False):
 
         active_syncs["bulk"]["status"] = "failed"
         active_syncs["bulk"]["error"] = str(e)
-        active_syncs["bulk"]["completed_at"] = datetime.utcnow().isoformat() + "Z"
+        active_syncs["bulk"]["completed_at"] = datetime.now(timezone.utc).isoformat() + "Z"
 
 
 @router.post("/sync/internal-trips")
@@ -416,12 +454,25 @@ async def run_reconciliation(target_date: date = None, db: Session = Depends(get
     if not target_date:
         target_date = date.today()
         
-    drivers = db.exec(select(Driver)).all()
+    drivers = db.exec(select(Driver).where(Driver.driver_type == "internal")).all()
     
     # 1. Run actual Phase 2 auto-reconciliation matching engine for each driver first!
     total_trips_matched = 0
     from app.services.reconciliation import reconcile_driver_unreconciled_deposits
     for d in drivers:
+        if d.shift not in ("Day", "Night"):
+            try:
+                notif = Notification(
+                    title="Missing Shift Assignment",
+                    message=f"Driver {d.name} has no valid shift assigned. Falling back to 24-hour reconciliation window.",
+                    type="warning",
+                    is_read=False,
+                    created_at=datetime.now(timezone.utc)
+                )
+                db.add(notif)
+                db.commit()
+            except Exception:
+                pass
         try:
             matched = reconcile_driver_unreconciled_deposits(db, d.id)
             total_trips_matched += matched
@@ -461,7 +512,7 @@ async def run_reconciliation(target_date: date = None, db: Session = Depends(get
             expected_stmt = expected_stmt.where(DriverTrip.booked_at >= start_datetime)
             
         expected_trips = db.exec(expected_stmt).all()
-        expected_amt = sum([t.price for t in expected_trips if t.price])
+        expected_amt = sum([(t.cash_collected if t.cash_collected is not None else 0.0) for t in expected_trips])
         
         # Calculate actual Telebirr deposits in this driver's deposit window
         actual_stmt = select(TelebirrTransaction).where(
@@ -651,12 +702,12 @@ async def upload_telebirr_csv(
         details = row.get("Details", "")
         opposite_party = row.get("Opposite Party", "")
         
-        # Parse timestamp
-        # Format: 07/05/2026 10:17:47
+        # Telebirr timestamps are in Ethiopia time (UTC+3)
+        ETH_TZ = timezone(timedelta(hours=3))
         try:
-            timestamp = datetime.strptime(completion_time_str, "%d/%m/%Y %H:%M:%S")
+            timestamp = datetime.strptime(completion_time_str, "%d/%m/%Y %H:%M:%S").replace(tzinfo=ETH_TZ)
         except:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc)
             
         # Extract Operator ID from Details
         operator_id = None
@@ -733,7 +784,7 @@ async def simulate_deposit(
         amount=amount,
         sender_identifier=driver.yango_driver_id,
         merchant_id="G2G-MERCHANT-001",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         status="success"
     )
     # We could call telebirr_webhook here if we wanted to simulate completely, 
@@ -841,7 +892,7 @@ async def unlink_deposit(
     # Subtract applied amount and recalculate trip reconciliation status
     trip.deposited_amount = max(0.0, trip.deposited_amount - amount_reverted)
     trip.reconciliation_status = recalculate_trip_status(trip)
-    trip.synced_at = datetime.utcnow()
+    trip.synced_at = datetime.now(timezone.utc)
     db.add(trip)
     
     # Release the transaction's reconciled state so it returns to the available general pool
@@ -914,7 +965,7 @@ async def link_deposit(
     trip.deposited_amount += amount_to_apply
     trip.reconciliation_status = recalculate_trip_status(trip)
     trip.reconciliation_notes = f"Manually linked {amount_to_apply:.2f} ETB from receipt {transaction_id[-6:]}"
-    trip.synced_at = datetime.utcnow()
+    trip.synced_at = datetime.now(timezone.utc)
     db.add(trip)
     
     # Update transaction is_reconciled state
@@ -956,7 +1007,7 @@ async def resolve_trip_exception(
         
     trip.reconciliation_status = status
     trip.reconciliation_notes = notes
-    trip.synced_at = datetime.utcnow()
+    trip.synced_at = datetime.now(timezone.utc)
     
     db.add(trip)
     

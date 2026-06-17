@@ -33,7 +33,7 @@ async def dashboard(
     
     # 2. Financial Stats (Global Cash Trips)
     total_expected_cash = db.exec(
-        select(func.sum(DriverTrip.price))
+        select(func.sum(func.coalesce(DriverTrip.cash_collected, DriverTrip.price)))
         .where(DriverTrip.payment_method == "cash", DriverTrip.status == "complete")
     ).first() or 0.0
     
@@ -43,7 +43,7 @@ async def dashboard(
     ).first() or 0.0
     
     today_expected_cash = db.exec(
-        select(func.sum(DriverTrip.price))
+        select(func.sum(func.coalesce(DriverTrip.cash_collected, DriverTrip.price)))
         .where(
             DriverTrip.payment_method == "cash", 
             DriverTrip.status == "complete",
@@ -189,7 +189,7 @@ async def exceptions_view(
         })
     
     # 3. Summary Stats
-    global_total_expected = db.exec(select(func.sum(DriverTrip.price)).where(DriverTrip.payment_method == "cash", DriverTrip.status == "complete")).first() or 0.0
+    global_total_expected = db.exec(select(func.sum(func.coalesce(DriverTrip.cash_collected, DriverTrip.price))).where(DriverTrip.payment_method == "cash", DriverTrip.status == "complete")).first() or 0.0
     global_total_actual = db.exec(select(func.sum(DriverTrip.deposited_amount)).where(DriverTrip.payment_method == "cash", DriverTrip.status == "complete")).first() or 0.0
     
     verified_count = db.exec(select(func.count(DriverTrip.id)).where(DriverTrip.payment_method == "cash", DriverTrip.reconciliation_status == "Verified")).first() or 0
@@ -204,7 +204,14 @@ async def exceptions_view(
         
         display_status = t.reconciliation_status
         if display_status == "Pending" and t.booked_at and t.booked_at.date() < today:
-            display_status = "Missing Deposit"
+            # Only show "Missing Deposit" if the driver's deposit window has closed
+            d = driver_map.get(t.driver_id)
+            if d and d.shift in ("Day", "Night"):
+                _, _, _, deposit_end = get_shift_windows(db, d.shift, t.booked_at.date())
+                if datetime.now(timezone.utc) > deposit_end:
+                    display_status = "Missing Deposit"
+            else:
+                display_status = "Missing Deposit"
             
         color = "red" if display_status == "Missing Deposit" else "orange" if display_status == "Partial Deposit" else "blue"
             
@@ -212,7 +219,7 @@ async def exceptions_view(
             "id": t.id,
             "short_id": t.short_id,
             "driver": driver,
-            "expected": t.price or 0.0,
+            "expected": t.cash_collected if t.cash_collected is not None else (t.price or 0.0),
             "actual": t.deposited_amount,
             "status": display_status,
             "notes": t.reconciliation_notes,
@@ -403,7 +410,7 @@ async def drivers_view(
     statement = (
         select(
             Driver,
-            func.coalesce(func.sum(DriverTrip.price), 0.0).label("total_expected"),
+            func.coalesce(func.sum(func.coalesce(DriverTrip.cash_collected, DriverTrip.price)), 0.0).label("total_expected"),
             func.coalesce(func.sum(DriverTrip.deposited_amount), 0.0).label("total_actual")
         )
         .outerjoin(DriverTrip, and_(*trip_conditions))
@@ -533,7 +540,7 @@ async def driver_detail_view(request: Request, driver_id: int, db: Session = Dep
         links = db.exec(select(DepositTripLink).where(DepositTripLink.trip_id.in_(trip_ids))).all()
     linked_trip_ids = {l.trip_id for l in links}
     
-    total_expected = sum([t.price for t in valid_trips if t.price and t.payment_method == "cash"])
+    total_expected = sum([(t.cash_collected if t.cash_collected is not None else (t.price or 0.0)) for t in valid_trips if t.payment_method == "cash"])
     
     # Total actual deposited is the total successful telebirr deposits + manual direct cash payments (no bank link)
     manual_cash_payments = sum([t.deposited_amount for t in valid_trips if t.id not in linked_trip_ids and t.deposited_amount])
@@ -556,13 +563,14 @@ async def driver_detail_view(request: Request, driver_id: int, db: Session = Dep
     compliance = (total_actual / total_expected * 100) if total_expected > 0 else 100.0
     
     today = date.today()
-    today_expected = sum([t.price for t in db_trips if t.price and t.payment_method == "cash" and t.booked_at and t.booked_at.date() == today])
+    today_expected = sum([(t.cash_collected if t.cash_collected is not None else (t.price or 0.0)) for t in db_trips if t.payment_method == "cash" and t.booked_at and t.booked_at.date() == today])
     total_made = sum([t.price for t in db_trips if t.price])
 
     yango_profile = await yango_client.get_driver_profile(driver.yango_driver_id)
         
     # Dynamic daily shift-aware reconciliations over the last 30 days
-    today_local = (datetime.utcnow() + timedelta(hours=3)).date()
+    ETH_TZ = timezone(timedelta(hours=3))
+    today_local = datetime.now(ETH_TZ).date()
     dynamic_reconciliations = []
     for i in range(30):
         target_date = today_local - timedelta(days=i)
@@ -577,7 +585,7 @@ async def driver_detail_view(request: Request, driver_id: int, db: Session = Dep
         if start_datetime:
             day_trips = [t for t in day_trips if ensure_utc(t.booked_at) >= start_datetime]
             
-        day_expected = sum([t.price for t in day_trips if t.price])
+        day_expected = sum([(t.cash_collected if t.cash_collected is not None else (t.price or 0.0)) for t in day_trips])
         
         # Telebirr transactions in shift deposit window
         day_txs = [tx for tx in transactions if tx.timestamp and ensure_utc(tx.timestamp) >= deposit_start and ensure_utc(tx.timestamp) < deposit_end]

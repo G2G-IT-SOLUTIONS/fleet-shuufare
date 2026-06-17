@@ -3,7 +3,7 @@ from fastapi import Depends, Cookie, HTTPException
 from fastapi.templating import Jinja2Templates
 from passlib.context import CryptContext
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import timezone, datetime
 
 from app.database import get_session
 from app.models import User, AuditLog
@@ -51,6 +51,6 @@ def _record_audit_log(db: Session, user_id: int, target_type: str, target_id: st
         old_value=str(old_value) if old_value is not None else None,
         new_value=str(new_value) if new_value is not None else None,
         user_id=user_id,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )
     db.add(log)

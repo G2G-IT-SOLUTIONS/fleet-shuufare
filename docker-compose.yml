@@ -4,15 +4,13 @@ services:
     container_name: flos-db
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword123}
-      POSTGRES_DB: ${POSTGRES_DB:-fleet-shuufare}
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-fleet-shuufare}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,23 +19,39 @@ services:
     build: .
     container_name: flos-web
     restart: always
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-rootpassword123}@db:5432/${POSTGRES_DB:-fleet-shuufare}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - APP_NAME=${APP_NAME:-G2G Fleet Management}
-      - DEBUG=${DEBUG:-True}
-      - SEED_DB=${SEED_DB:-true}
-      - YANGO_BASE_URL=${YANGO_BASE_URL:-https://fleet-api.yango.tech}
-      - YANGO_API_KEY=${YANGO_API_KEY:-YCbHdwOubAjSjtClcxEwcOCBzVzWgmCgUs}
-      - YANGO_CLIENT_ID=${YANGO_CLIENT_ID:-taxi/park/475f2435754b428ea9f0f000ef7de1fc}
-      - YANGO_PARK_ID=${YANGO_PARK_ID:-475f2435754b428ea9f0f000ef7de1fc}
-      - PLAYSMS_URL=${PLAYSMS_URL:-https://172.168.9.134:8080/index.php}
-      - PLAYSMS_USER=${PLAYSMS_USER:-melaku.tilahun}
-      - PLAYSMS_TOKEN=${PLAYSMS_TOKEN:-e7ef17be6222d434ce346927ff7a758a}
+      - DEBUG=${DEBUG:-False}
+      - SEED_DB=${SEED_DB:-false}
+      - YANGO_BASE_URL=${YANGO_BASE_URL}
+      - YANGO_API_KEY=${YANGO_API_KEY}
+      - YANGO_CLIENT_ID=${YANGO_CLIENT_ID}
+      - YANGO_PARK_ID=${YANGO_PARK_ID}
+      - PLAYSMS_URL=${PLAYSMS_URL}
+      - PLAYSMS_USER=${PLAYSMS_USER}
+      - PLAYSMS_TOKEN=${PLAYSMS_TOKEN}
     depends_on:
       db:
         condition: service_healthy
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: flos-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

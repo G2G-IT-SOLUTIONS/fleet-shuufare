@@ -33,12 +33,11 @@ def on_startup():
             {"key": "DEEP_SCAN_MAX_DAYS", "value": "365", "description": "Maximum search timeframe for Deep Scan orders lookup", "data_type": "int"},
             {"key": "AUTO_SYNC_ENABLED", "value": "true", "description": "Enable automated background order syncing", "data_type": "string"},
             {"key": "AUTO_SYNC_INTERVAL_HOURS", "value": "6", "description": "Interval in hours between automated background runs", "data_type": "int"},
-            {"key": "RECONCILE_ENFORCE_TIME_SEQUENCE", "value": "true", "description": "If enabled, automatic reconciliation will only match Telebirr deposits with trips completed before the deposit timestamp", "data_type": "string"},
             {"key": "SMS_GATEWAY_PHONE_FORMAT", "value": "canonical", "description": "Phone number format expected by the SMS gateway ('canonical' for +251..., 'international_no_plus' for 251..., 'local_with_zero' for 09..., 'raw_9_digits' for 9...)", "data_type": "string"},
-            {"key": "SHIFT_DAY_START", "value": "06:00", "description": "Start time for the Day Shift (Format HH:MM)", "data_type": "string"},
-            {"key": "SHIFT_DAY_END", "value": "18:00", "description": "End time for the Day Shift (Format HH:MM)", "data_type": "string"},
-            {"key": "SHIFT_NIGHT_START", "value": "18:00", "description": "Start time for the Night Shift (Format HH:MM)", "data_type": "string"},
-            {"key": "SHIFT_NIGHT_END", "value": "06:00", "description": "End time for the Night Shift (Format HH:MM)", "data_type": "string"}
+            {"key": "SHIFT_DAY_START", "value": "07:00", "description": "Start time for the Day Shift (Format HH:MM)", "data_type": "string"},
+            {"key": "SHIFT_DAY_END", "value": "19:00", "description": "End time for the Day Shift (Format HH:MM)", "data_type": "string"},
+            {"key": "SHIFT_NIGHT_START", "value": "19:00", "description": "Start time for the Night Shift (Format HH:MM)", "data_type": "string"},
+            {"key": "SHIFT_NIGHT_END", "value": "07:00", "description": "End time for the Night Shift (Format HH:MM)", "data_type": "string"}
         ]
         
         for conf in default_configs:
@@ -64,6 +63,9 @@ def on_shutdown():
         print("[Shutdown] Background scheduler shut down cleanly.")
     except Exception as shutdown_err:
         print(f"[Shutdown] Error during background scheduler shutdown: {shutdown_err}")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 # Register Routers
 app.include_router(auth.router, tags=["Authentication"])

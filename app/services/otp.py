@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import timezone, datetime, timedelta
 from typing import Dict
 
 # In-memory database mapping phone numbers to active OTP data
@@ -74,7 +74,7 @@ def store_otp(phone: str, otp: str, expire_minutes: int = 5):
     Store an OTP for a normalized phone number with an expiration window.
     """
     phone_norm = normalize_phone_number(phone)
-    expires_at = datetime.utcnow() + timedelta(minutes=expire_minutes)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expire_minutes)
     active_otps[phone_norm] = {
         "otp": otp,
         "expires_at": expires_at
@@ -96,7 +96,7 @@ def verify_otp(phone: str, otp: str) -> bool:
         return False
         
     # Check expiration
-    if datetime.utcnow() > otp_data["expires_at"]:
+    if datetime.now(timezone.utc) > otp_data["expires_at"]:
         del active_otps[phone_norm]
         return False
         

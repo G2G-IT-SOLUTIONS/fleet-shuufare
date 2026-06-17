@@ -107,6 +107,7 @@ class DriverTrip(SQLModel, table=True):
     category: Optional[str] = None
     payment_method: Optional[str] = None
     price: Optional[float] = None
+    cash_collected: Optional[float] = None
     provider: Optional[str] = None
     booked_at: Optional[datetime] = None
     yango_created_at: Optional[datetime] = None

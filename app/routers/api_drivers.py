@@ -227,7 +227,7 @@ async def run_driver_sync_background(driver_id: int):
     active_syncs["drivers"][driver_id] = {
         "status": "running",
         "progress": 0,
-        "started_at": datetime.utcnow().isoformat() + "Z",
+        "started_at": datetime.now(timezone.utc).isoformat() + "Z",
         "completed_at": None,
         "trips_inserted": 0,
         "trips_updated": 0,
@@ -241,7 +241,7 @@ async def run_driver_sync_background(driver_id: int):
             if not driver:
                 active_syncs["drivers"][driver_id]["status"] = "failed"
                 active_syncs["drivers"][driver_id]["error"] = "Driver not found"
-                active_syncs["drivers"][driver_id]["completed_at"] = datetime.utcnow().isoformat() + "Z"
+                active_syncs["drivers"][driver_id]["completed_at"] = datetime.now(timezone.utc).isoformat() + "Z"
                 return
             
             driver_name = driver.name
@@ -254,7 +254,7 @@ async def run_driver_sync_background(driver_id: int):
                     message=f"Manual sync has been initiated in the background for driver {driver_name}.",
                     type="info",
                     is_read=False,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
                 db.add(start_notif)
                 db.commit()
@@ -281,13 +281,36 @@ async def run_driver_sync_background(driver_id: int):
         
         active_syncs["drivers"][driver_id]["progress"] = 50 # fetch complete, processing
         
+        # Fetch exact cash_collected from Yango transactions API for cash orders
+        cash_map = {}
+        if yango_orders:
+            order_ids = [o.get("id") for o in yango_orders if o.get("id") and o.get("payment_method") == "cash"]
+            if order_ids:
+                try:
+                    transactions = await yango_client.get_order_transactions(order_ids)
+                    for tx in transactions:
+                        if tx.get("category_id") == "cash_collected":
+                            o_id = tx.get("order_id")
+                            amt_str = tx.get("amount")
+                            if o_id and amt_str:
+                                try:
+                                    cash_map[o_id] = float(amt_str)
+                                except ValueError:
+                                    pass
+                except Exception as tx_err:
+                    print(f"Error fetching transactions for driver {driver_name}: {tx_err}")
+        
+        active_syncs["drivers"][driver_id]["progress"] = 70 # transactions fetched
+        
         trips_inserted = 0
         trips_updated = 0
         
         # --- Session 2: Short-lived database session to write trips & success state ---
         with Session(engine) as db:
             for o in yango_orders:
-                _, inserted, updated = _upsert_trip(db, o, driver_id)
+                o_id = o.get("id")
+                exact_cash = cash_map.get(o_id)
+                _, inserted, updated = _upsert_trip(db, o, driver_id, cash_collected=exact_cash)
                 if inserted:
                     trips_inserted += 1
                 if updated:
@@ -299,15 +322,15 @@ async def run_driver_sync_background(driver_id: int):
             if not last_sync_conf:
                 last_sync_conf = SystemConfig(
                     key=config_key,
-                    value=datetime.utcnow().isoformat() + "Z",
+                    value=datetime.now(timezone.utc).isoformat() + "Z",
                     description=f"Timestamp of last sync for driver {driver_id}",
                     data_type="string",
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.now(timezone.utc)
                 )
                 db.add(last_sync_conf)
             else:
-                last_sync_conf.value = datetime.utcnow().isoformat() + "Z"
-                last_sync_conf.updated_at = datetime.utcnow()
+                last_sync_conf.value = datetime.now(timezone.utc).isoformat() + "Z"
+                last_sync_conf.updated_at = datetime.now(timezone.utc)
                 db.add(last_sync_conf)
             
             db.commit()
@@ -330,7 +353,7 @@ async def run_driver_sync_background(driver_id: int):
                     message=f"Manual sync for driver {driver_name} completed successfully: Imported {trips_inserted} new trips and updated {trips_updated} trips.",
                     type="success",
                     is_read=False,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
                 db.add(notif)
                 db.commit()
@@ -341,7 +364,7 @@ async def run_driver_sync_background(driver_id: int):
         active_syncs["drivers"][driver_id]["progress"] = 100
         active_syncs["drivers"][driver_id]["trips_inserted"] = trips_inserted
         active_syncs["drivers"][driver_id]["trips_updated"] = trips_updated
-        active_syncs["drivers"][driver_id]["completed_at"] = datetime.utcnow().isoformat() + "Z"
+        active_syncs["drivers"][driver_id]["completed_at"] = datetime.now(timezone.utc).isoformat() + "Z"
             
     except Exception as e:
         print(f"Error syncing driver orders: {e}")
@@ -354,7 +377,7 @@ async def run_driver_sync_background(driver_id: int):
                     message=f"Manual sync failed for driver {driver_name}: {str(e)}",
                     type="error",
                     is_read=False,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
                 db.add(notif)
                 db.commit()
@@ -363,7 +386,7 @@ async def run_driver_sync_background(driver_id: int):
 
         active_syncs["drivers"][driver_id]["status"] = "failed"
         active_syncs["drivers"][driver_id]["error"] = str(e)
-        active_syncs["drivers"][driver_id]["completed_at"] = datetime.utcnow().isoformat() + "Z"
+        active_syncs["drivers"][driver_id]["completed_at"] = datetime.now(timezone.utc).isoformat() + "Z"
 
 
 @router.post("/{driver_id}/sync-orders")
@@ -514,33 +537,28 @@ async def mark_shift_paid(
             return dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc)
         
-    # Query all completed cash trips for this driver
-    trips = db.exec(
+    # Query only trips within the shift window directly in SQL
+    trips_to_update = db.exec(
         select(DriverTrip)
         .where(
             DriverTrip.driver_id == driver_id,
             DriverTrip.payment_method == "cash",
-            DriverTrip.status == "complete"
+            DriverTrip.status == "complete",
+            DriverTrip.booked_at >= trip_start,
+            DriverTrip.booked_at < trip_end,
+            DriverTrip.reconciliation_status != "Verified"
         )
     ).all()
-    
-    trips_to_update = []
-    for t in trips:
-        if t.booked_at:
-            utc_booked = ensure_utc(t.booked_at)
-            if trip_start <= utc_booked < trip_end:
-                if t.reconciliation_status != "Verified":
-                    trips_to_update.append(t)
                     
     # Update trips
     for trip in trips_to_update:
         old_status = trip.reconciliation_status
         old_deposited = trip.deposited_amount
         
-        trip.deposited_amount = trip.price or 0.0
+        trip.deposited_amount = trip.cash_collected if trip.cash_collected is not None else (trip.price or 0.0)
         trip.reconciliation_status = "Verified"
-        trip.reconciliation_notes = notes or f"Shift manually marked as paid by Admin on {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
-        trip.synced_at = datetime.utcnow()
+        trip.reconciliation_notes = notes or f"Shift manually marked as paid by Admin on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
+        trip.synced_at = datetime.now(timezone.utc)
         db.add(trip)
         
         # Audit logging

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select, func
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import Optional
 
 from app.models import User, SystemConfig, Notification
@@ -19,7 +19,7 @@ async def update_configs(request: Request, db: Session = Depends(get_session), u
         config = db.get(SystemConfig, key)
         if config:
             config.value = str(value)
-            config.updated_at = datetime.utcnow()
+            config.updated_at = datetime.now(timezone.utc)
             db.add(config)
             
     db.commit()

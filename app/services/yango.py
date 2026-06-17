@@ -334,6 +334,47 @@ class YangoClient:
                     
         return all_orders
 
+    async def get_order_transactions(self, order_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        Fetch financial transactions for a list of order IDs.
+        Chunks the requests into batches of 100 to respect Yango's API limits.
+        """
+        if not order_ids:
+            return []
+            
+        url = f"{self.base_url}/v2/parks/orders/transactions/list"
+        all_transactions = []
+        
+        # Split order_ids into chunks of 100 (Yango API max limit)
+        batch_size = 100
+        for i in range(0, len(order_ids), batch_size):
+            chunk = order_ids[i:i + batch_size]
+            payload = {
+                "query": {
+                    "park": {
+                        "id": self.park_id,
+                        "order": {
+                            "ids": chunk
+                        }
+                    }
+                }
+            }
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                try:
+                    response = await self._post_with_retry(client, url, payload)
+                    data = response.json()
+                    transactions = data.get("transactions", [])
+                    all_transactions.extend(transactions)
+                except Exception as e:
+                    print(f"Error fetching transactions for batch: {e}")
+            
+            # Short sleep to prevent rate limiting
+            import asyncio
+            await asyncio.sleep(0.5)
+            
+        return all_transactions
+
     async def get_orders_page(
         self, 
         cursor: str = None, 
