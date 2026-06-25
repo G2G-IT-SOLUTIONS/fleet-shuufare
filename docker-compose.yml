@@ -41,8 +41,10 @@ services:
     image: flos-web:latest
     container_name: flos-web
     restart: unless-stopped
-    expose:
-      - "8000"
+    ports:
+      # Bind only to localhost so only the shared Caddy on this host can reach it.
+      # The external Caddy proxies flos.shuufare.com → 127.0.0.1:8000
+      - "127.0.0.1:8000:8000"
     environment:
       # ── Database (uses internal Docker network hostname "db") ──
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
@@ -75,29 +77,13 @@ services:
       retries: 5
       start_period: 60s
 
-  # ── Caddy Reverse Proxy ────────────────────────────────────────────────────
-  caddy:
-    image: caddy:2-alpine
-    container_name: flos-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      web:
-        condition: service_healthy
-    networks:
-      - flos-net
+  # NOTE: No bundled Caddy — the server's shared Caddy instance handles
+  # TLS termination and reverse proxying for flos.shuufare.com → 127.0.0.1:8000
+  # See Caddyfile.snippet for the block to add to the shared Caddyfile.
 
 # ── Named Volumes ────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
-  caddy_data:
-  caddy_config:
 
 # ── Isolated Bridge Network ──────────────────────────────────────────────────
 networks:

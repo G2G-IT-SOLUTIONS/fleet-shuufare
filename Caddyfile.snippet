@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  FLOS — Caddy snippet for the shared Caddyfile on the server
+#
+#  ADD THIS BLOCK to the server's existing Caddyfile
+#  (the one that already handles bonus.shuufare.com)
+#
+#  The FLOS web container binds to 127.0.0.1:8000 on the host.
+#  Caddy proxies flos.shuufare.com traffic to it.
+#
+#  Caddy auto-provisions a Let's Encrypt TLS certificate for flos.shuufare.com
+#  as long as the domain's A record points to this server's public IP.
+# ─────────────────────────────────────────────────────────────────────────────
+
+flos.shuufare.com {
+
+    # Compress responses
+    encode gzip zstd
+
+    # Forward to the FLOS web container (bound to host's loopback on port 8000)
+    reverse_proxy 127.0.0.1:8000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Upstream health check
+        health_uri /docs
+        health_interval 30s
+        health_timeout 10s
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  After adding this block, reload Caddy with:
+#    caddy reload --config /path/to/Caddyfile
+#  Or if running as a service:
+#    systemctl reload caddy
+# ─────────────────────────────────────────────────────────────────────────────
