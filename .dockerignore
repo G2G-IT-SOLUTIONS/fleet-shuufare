@@ -1,32 +1,60 @@
-# Docker ignore list
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
+
+# Virtual environments (use image's Python instead)
 env/
 venv/
 .venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Git
 .git/
 .gitignore
+.gitattributes
+
+# Secrets (injected via environment variables at runtime)
 .env
+
+# Local SQLite database (PostgreSQL is used in Docker)
 database.db
+*.sqlite3
+
+# Debug / log files
 sync_debug.log
+
+# IDE / editor config
 .gemini/
-brain/
-scratch/
 .idea/
 .vscode/
-*.csv
-Dockerfile
-docker-compose.yml
+
+# Documentation (not needed in image)
 README.md
 API_REFERENCE.md
 TESTING_GUIDE.md
-driver api doc.md
-drivers api doc.md
-order track api.md
-orders api doc.md
+*.md
+
+# Large data exports
+*.csv
+*.xls
+*.xlsx
+
+# Temp directories
+tempdb/
+scripts/
+
+# Alter/seed/debug scripts (only entrypoint.sh and seed.py are needed)
+alter_db*.py
+reset_db.py
+update_db.py
+update_descriptions.py
+export_*.py
+check_syntax.py
+yango_api.py
+main_legacy.bak
+seed_configs.py

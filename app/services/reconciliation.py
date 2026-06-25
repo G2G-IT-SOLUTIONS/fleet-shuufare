@@ -1,7 +1,8 @@
 from datetime import datetime, timezone, date, timedelta
-from typing import Optional, Tuple
-from sqlmodel import Session, select, or_
+from typing import Optional, List
+from sqlmodel import Session, select
 from app.models import Driver, TelebirrTransaction, DriverTrip, DepositTripLink, ReconciliationBatch, SystemConfig
+
 
 def _parse_shift_times(db: Session):
     """Read shift boundary times from SystemConfig and return parsed (hour, minute) tuples."""
@@ -54,7 +55,6 @@ def get_shift_windows(db: Session, driver_shift: str, target_date: date):
     return trip_start.astimezone(timezone.utc), trip_end.astimezone(timezone.utc), deposit_start.astimezone(timezone.utc), deposit_end.astimezone(timezone.utc)
 
 
-
 def recalculate_trip_status(trip: DriverTrip) -> str:
     """Helper to determine the correct reconciliation status based strictly on deposited vs cash_collected."""
     target_amount = trip.cash_collected if trip.cash_collected is not None else 0.0
@@ -67,6 +67,101 @@ def recalculate_trip_status(trip: DriverTrip) -> str:
     elif trip.deposited_amount > 0 and trip.deposited_amount < target_amount:
         return "Partial Deposit"
     return "Pending"
+
+
+def _waterfall_apply(
+    db: Session,
+    transaction_id: str,
+    deposit_amount: float,
+    pending_trips: List[DriverTrip],
+    batch_id: Optional[int] = None
+) -> int:
+    """
+    Greedily applies deposit_amount across pending_trips (must be sorted oldest-first by booked_at).
+
+    For each trip, applies as much of the remaining deposit as needed to fully cover it.
+    If the deposit is exhausted before all trips are covered, the last touched trip gets
+    a Partial Deposit and remaining trips stay Pending.
+    If the deposit exceeds all trips, the surplus is applied to the last trip (Excess Deposit).
+
+    Creates one DepositTripLink per trip touched, recording the exact amount applied.
+    Returns the number of trips touched (>0 means the transaction should be stored).
+    """
+    remaining = deposit_amount
+    trips_touched = 0
+    last_trip: Optional[DriverTrip] = None
+    last_link: Optional[DepositTripLink] = None
+
+    for trip in pending_trips:
+        if remaining < 0.005:
+            break
+
+        target_amount = trip.cash_collected if trip.cash_collected is not None else 0.0
+        needed = max(0.0, target_amount - trip.deposited_amount)
+
+        if needed < 0.005:
+            # Already fully covered (shouldn't appear in pool, but guard safely)
+            continue
+
+        # Apply as much as needed (capped at remaining); excess handled after loop
+        applied = min(remaining, needed)
+
+        trip.deposited_amount += applied
+        trip.reconciliation_status = recalculate_trip_status(trip)
+        db.add(trip)
+
+        link = DepositTripLink(
+            transaction_id=transaction_id,
+            trip_id=trip.id,
+            amount_applied=applied,
+            batch_id=batch_id
+        )
+        db.add(link)
+
+        remaining -= applied
+        trips_touched += 1
+        last_trip = trip
+        last_link = link
+
+    # If deposit exceeded all trips, apply the surplus to the last touched trip
+    if remaining > 0.005 and last_trip is not None and last_link is not None:
+        last_trip.deposited_amount += remaining
+        last_trip.reconciliation_status = recalculate_trip_status(last_trip)
+        db.add(last_trip)
+        last_link.amount_applied += remaining
+        db.add(last_link)
+
+    return trips_touched
+
+
+def _build_pending_trips_query(
+    db: Session,
+    driver_id: int,
+    before_timestamp: datetime,
+    reconciliation_start_date: Optional[date] = None
+):
+    """
+    Returns all eligible unreconciled cash trips for a driver, sorted oldest-first.
+    Includes both Pending and Partial Deposit trips so bulk deposits can top up
+    partially-paid trips before moving on to fully-unpaid ones.
+    """
+    stmt = select(DriverTrip).where(
+        DriverTrip.driver_id == driver_id,
+        DriverTrip.payment_method == "cash",
+        DriverTrip.status == "complete",
+        DriverTrip.reconciliation_status.in_(["Pending", "Partial Deposit"]),
+        DriverTrip.booked_at <= before_timestamp
+    )
+
+    if reconciliation_start_date:
+        stmt = stmt.where(
+            DriverTrip.booked_at >= datetime.combine(
+                reconciliation_start_date, datetime.min.time()
+            ).replace(tzinfo=timezone.utc)
+        )
+
+    return db.exec(stmt.order_by(DriverTrip.booked_at.asc())).all()
+
 
 def process_telebirr_deposit(
     db: Session,
@@ -82,19 +177,24 @@ def process_telebirr_deposit(
     batch_id: Optional[int] = None
 ) -> dict:
     """
-    Core logic to record a Telebirr transaction and reconcile it against a driver's pending trips.
-    Uses the driver's shift to scope which trips are eligible, then applies amount matching
-    (exact first, closest-amount fallback). Only stores the transaction if it matches a trip.
+    Records a Telebirr transaction and reconciles it against a driver's outstanding cash trips
+    using a waterfall strategy: oldest trips are paid first, partial deposits are allowed,
+    and any surplus after all trips are covered is applied to the last trip as Excess Deposit.
+
+    A single transaction may satisfy multiple trips. One DepositTripLink is created per trip touched.
+    The transaction is only stored in the database if the driver is found AND at least one trip is touched.
     """
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=timezone.utc)
 
     # 1. Idempotency Check
-    existing_tx = db.exec(select(TelebirrTransaction).where(TelebirrTransaction.transaction_id == transaction_id)).first()
+    existing_tx = db.exec(
+        select(TelebirrTransaction).where(TelebirrTransaction.transaction_id == transaction_id)
+    ).first()
     if existing_tx:
         return {"status": "skipped", "message": f"Transaction {transaction_id} already exists."}
 
-    # 2. Find the driver
+    # 2. Find the driver (by operator_id, then yango_driver_id, then phone)
     driver = None
     if operator_id:
         driver = db.exec(select(Driver).where(Driver.operator_id == operator_id)).first()
@@ -113,49 +213,12 @@ def process_telebirr_deposit(
             "is_reconciled": False
         }
 
-    # 3. Search all pending cash trips up to the deposit timestamp
-    stmt = select(DriverTrip).where(
-        DriverTrip.driver_id == driver.id,
-        DriverTrip.payment_method == "cash",
-        DriverTrip.reconciliation_status != "Verified",
-        DriverTrip.status == "complete",
-        DriverTrip.deposited_amount == 0.0,
-        DriverTrip.booked_at <= timestamp
+    # 3. Fetch all eligible unreconciled/partially-reconciled cash trips (oldest first)
+    pending_trips = _build_pending_trips_query(
+        db, driver.id, timestamp, driver.reconciliation_start_date
     )
 
-    if driver.reconciliation_start_date:
-        stmt = stmt.where(DriverTrip.booked_at >= datetime.combine(driver.reconciliation_start_date, datetime.min.time()).replace(tzinfo=timezone.utc))
-
-    pending_trips = db.exec(stmt.order_by(DriverTrip.booked_at.desc())).all()
-
-    # Phase 1: Exact Amount Matching (1-to-1)
-    matched_trip = None
-    for trip in pending_trips:
-        target_amount = trip.cash_collected if trip.cash_collected is not None else 0.0
-        amount_needed = target_amount - trip.deposited_amount
-
-        # Allow a small float tolerance
-        if abs(amount - amount_needed) < 0.01:
-            matched_trip = trip
-            break
-
-    # Phase 2: Closest-Amount Matching (1-to-1 fallback)
-    if not matched_trip and pending_trips:
-        trips_with_needed = []
-        for t in pending_trips:
-            target_amt = t.cash_collected if t.cash_collected is not None else 0.0
-            needed = target_amt - t.deposited_amount
-            trips_with_needed.append((t, needed))
-
-        if trips_with_needed:
-            matched_trip, _ = min(
-                trips_with_needed,
-                # Prefer closest amount; on tie, prefer the most RECENT trip
-                key=lambda x: (abs(x[1] - amount), -(x[0].booked_at.timestamp() if x[0].booked_at else 0))
-            )
-
-    # 4. Only store the transaction if it matched a trip
-    if not matched_trip:
+    if not pending_trips:
         return {
             "status": "success",
             "driver_found": True,
@@ -165,7 +228,7 @@ def process_telebirr_deposit(
             "is_reconciled": False
         }
 
-    # Store transaction only now that we have a confirmed match
+    # 4. Store the transaction now that we have a confirmed driver and pending trips
     tx = TelebirrTransaction(
         transaction_id=transaction_id,
         amount=amount,
@@ -178,34 +241,26 @@ def process_telebirr_deposit(
         is_reconciled=True
     )
     db.add(tx)
-    db.flush()
+    db.flush()  # Ensure transaction_id is available for DepositTripLink FKs
 
-    # Apply the entire deposit to this single matched trip
-    matched_trip.deposited_amount += amount
-    matched_trip.reconciliation_status = recalculate_trip_status(matched_trip)
-    db.add(matched_trip)
-
-    link = DepositTripLink(
-        transaction_id=transaction_id,
-        trip_id=matched_trip.id,
-        amount_applied=amount,
-        batch_id=batch_id
-    )
-    db.add(link)
+    # 5. Waterfall: apply deposit across trips oldest-first
+    trips_touched = _waterfall_apply(db, transaction_id, amount, pending_trips, batch_id)
 
     return {
         "status": "success",
         "driver_found": True,
         "driver_name": driver.name,
-        "trips_reconciled": 1,
+        "trips_reconciled": trips_touched,
         "amount": amount,
         "is_reconciled": True
     }
+
 
 def reverse_batch(db: Session, batch_id: int) -> dict:
     """
     Undoes all reconciliations linked to a specific batch.
     Reverts trip amounts and statuses, deletes links, marks transactions as unreconciled.
+    Handles multiple DepositTripLinks per transaction (waterfall splits).
     """
     batch = db.get(ReconciliationBatch, batch_id)
     if not batch:
@@ -222,7 +277,7 @@ def reverse_batch(db: Session, batch_id: int) -> dict:
     for link in links:
         trip = db.get(DriverTrip, link.trip_id)
         if trip:
-            trip.deposited_amount = max(0, trip.deposited_amount - link.amount_applied)
+            trip.deposited_amount = max(0.0, trip.deposited_amount - link.amount_applied)
             trip.reconciliation_status = recalculate_trip_status(trip)
             db.add(trip)
             trips_affected.add(trip.id)
@@ -231,10 +286,17 @@ def reverse_batch(db: Session, batch_id: int) -> dict:
         db.delete(link)
 
     for tx_id in txs_affected:
-        tx = db.exec(select(TelebirrTransaction).where(TelebirrTransaction.transaction_id == tx_id)).first()
+        tx = db.exec(
+            select(TelebirrTransaction).where(TelebirrTransaction.transaction_id == tx_id)
+        ).first()
         if tx:
-            # Check if this tx still has other links (shouldn't if it was all in this batch, but just in case)
-            other_links = db.exec(select(DepositTripLink).where(DepositTripLink.transaction_id == tx_id, DepositTripLink.batch_id != batch_id)).first()
+            # Only un-reconcile if no other batches still reference this transaction
+            other_links = db.exec(
+                select(DepositTripLink).where(
+                    DepositTripLink.transaction_id == tx_id,
+                    DepositTripLink.batch_id != batch_id
+                )
+            ).first()
             if not other_links:
                 tx.is_reconciled = False
                 db.add(tx)
@@ -249,17 +311,20 @@ def reverse_batch(db: Session, batch_id: int) -> dict:
         "transactions_unreconciled": len(txs_affected)
     }
 
+
 def reconcile_driver_unreconciled_deposits(db: Session, driver_id: int) -> int:
     """
-    Takes all completed but unreconciled Telebirr deposits for a driver,
-    and matches them against pending cash trips using the 1-to-1 matching logic.
-    Scopes trips to the driver's shift window. Returns the number of trips successfully reconciled.
+    Takes all completed but unreconciled Telebirr deposits for a driver and applies them
+    against outstanding cash trips using the waterfall strategy (oldest trips first).
+
+    Each unreconciled transaction is processed in timestamp order, so earlier deposits
+    are applied before later ones. Returns the total number of trips touched.
     """
     driver = db.get(Driver, driver_id)
     if not driver:
         return 0
 
-    # Get all completed but unreconciled transactions for the driver
+    # Get all completed but unreconciled transactions for this driver, oldest first
     unreconciled_txs = db.exec(
         select(TelebirrTransaction)
         .where(TelebirrTransaction.driver_id == driver_id)
@@ -271,70 +336,23 @@ def reconcile_driver_unreconciled_deposits(db: Session, driver_id: int) -> int:
     if not unreconciled_txs:
         return 0
 
-    trips_reconciled = 0
+    total_trips_reconciled = 0
 
     for tx in unreconciled_txs:
-        # Fetch all pending cash trips prior to the deposit timestamp
-        stmt = select(DriverTrip).where(
-            DriverTrip.driver_id == driver_id,
-            DriverTrip.payment_method == "cash",
-            DriverTrip.reconciliation_status != "Verified",
-            DriverTrip.status == "complete",
-            DriverTrip.deposited_amount == 0.0,
-            DriverTrip.booked_at <= tx.timestamp
+        # Fetch all pending/partial trips before this deposit's timestamp (oldest first)
+        pending_trips = _build_pending_trips_query(
+            db, driver_id, tx.timestamp, driver.reconciliation_start_date
         )
-
-        if driver.reconciliation_start_date:
-            stmt = stmt.where(DriverTrip.booked_at >= datetime.combine(driver.reconciliation_start_date, datetime.min.time()).replace(tzinfo=timezone.utc))
-
-        pending_trips = db.exec(stmt.order_by(DriverTrip.booked_at.desc())).all()
 
         if not pending_trips:
             continue
 
-        # Phase 1: Exact Amount Matching (1-to-1)
-        matched_trip = None
-        for trip in pending_trips:
-            target_amount = trip.cash_collected if trip.cash_collected is not None else 0.0
-            amount_needed = target_amount - trip.deposited_amount
+        # Waterfall: apply this transaction's amount across eligible trips
+        trips_touched = _waterfall_apply(db, tx.transaction_id, tx.amount, pending_trips, batch_id=None)
 
-            # Allow a small float tolerance
-            if abs(tx.amount - amount_needed) < 0.01:
-                matched_trip = trip
-                break
-
-        # Phase 2: Closest-Amount Matching (1-to-1 fallback)
-        if not matched_trip and pending_trips:
-            trips_with_needed = []
-            for t in pending_trips:
-                target_amt = t.cash_collected if t.cash_collected is not None else 0.0
-                needed = target_amt - t.deposited_amount
-                trips_with_needed.append((t, needed))
-
-            if trips_with_needed:
-                matched_trip, _ = min(
-                    trips_with_needed,
-                    # Prefer closest amount; on tie, prefer the most RECENT trip
-                    key=lambda x: (abs(x[1] - tx.amount), -(x[0].booked_at.timestamp() if x[0].booked_at else 0))
-                )
-
-        if matched_trip:
-            # Apply the entire deposit to this single matched trip
-            matched_trip.deposited_amount += tx.amount
-            matched_trip.reconciliation_status = recalculate_trip_status(matched_trip)
-            db.add(matched_trip)
-
-            link = DepositTripLink(
-                transaction_id=tx.transaction_id,
-                trip_id=matched_trip.id,
-                amount_applied=tx.amount,
-                batch_id=None  # Post-sync auto-reconciliation has no CSV batch ID
-            )
-            db.add(link)
-
+        if trips_touched > 0:
             tx.is_reconciled = True
             db.add(tx)
+            total_trips_reconciled += trips_touched
 
-            trips_reconciled += 1
-
-    return trips_reconciled
+    return total_trips_reconciled

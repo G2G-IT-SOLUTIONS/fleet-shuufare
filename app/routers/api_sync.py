@@ -456,7 +456,7 @@ async def run_reconciliation(target_date: date = None, db: Session = Depends(get
         
     drivers = db.exec(select(Driver).where(Driver.driver_type == "internal")).all()
     
-    # 1. Run actual Phase 2 auto-reconciliation matching engine for each driver first!
+    # 1. Run waterfall auto-reconciliation for each driver (applies unreconciled deposits oldest-trip-first)
     total_trips_matched = 0
     from app.services.reconciliation import reconcile_driver_unreconciled_deposits
     for d in drivers:

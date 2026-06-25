@@ -1,3 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  FLOS Caddy Configuration
+#
+#  To enable HTTPS:
+#    - Change "http://flos.shuufare.com" → "flos.shuufare.com"
+#    - Point the domain's A record to this server's public IP
+#    - Caddy will auto-provision a Let's Encrypt TLS certificate
+#
+#  For HTTP-only (internal/LAN use), keep "http://" prefix as-is.
+# ─────────────────────────────────────────────────────────────────────────────
+
 http://flos.shuufare.com {
-    reverse_proxy web:8000
+
+    # Compress responses for faster delivery
+    encode gzip zstd
+
+    # Forward all requests to the FastAPI container
+    # "web" resolves via Docker's internal flos-net network
+    reverse_proxy web:8000 {
+        # Pass real client IP to the app (used by FastAPI for logging / rate limiting)
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Health check: Caddy will only send traffic when the upstream is alive
+        health_uri /docs
+        health_interval 30s
+        health_timeout 10s
+    }
+
+    # Serve Caddy's default access logs to stdout (visible in docker logs flos-caddy)
+    log {
+        output stdout
+        format console
+    }
 }
